@@ -1,0 +1,178 @@
+/**
+ * title.css — Écran titre (logo + cubes qui orbitent + prompt "Appuyez sur Entrée").
+ *
+ * L'écran titre est monté comme une scène 3D via titleScene.js. Les éléments
+ * visuels principaux sont :
+ *   - un fond animé (skybox + fog gérés au niveau global)
+ *   - le logo "TETRIS 64" avec effet relief
+ *   - un sous-titre discret
+ *   - une ceinture de tétrominos qui orbitent (calculs de position en JS)
+ *   - un prompt clignotant "APPUYEZ SUR ENTRÉE"
+ *   - une ligne de crédits en bas
+ */
+
+ .title-scene {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    perspective: 1200px;
+  }
+  
+  /* ==========================================================================
+     LOGO
+     ========================================================================== */
+  
+  .title__logo-wrap {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-style: preserve-3d;
+    /* Centré autour du point (0,0) ; le wrap est en pseudo-3D au-dessus */
+    transform: translate3d(-50%, -60%, 0);
+    text-align: center;
+    pointer-events: none;
+    animation: title-logo-float 3.4s ease-in-out infinite;
+  }
+  
+  .title__logo {
+    font-family: 'Lilita One', 'Press Start 2P', sans-serif;
+    font-size: clamp(48px, 13vw, 180px);
+    line-height: 0.9;
+    letter-spacing: 6px;
+    color: var(--n64-gold, #F0C040);
+    margin: 0;
+    text-shadow:
+      /* Contour N64 épais */
+      4px  4px 0 var(--outline-dark),
+      -4px -4px 0 var(--outline-dark),
+       4px -4px 0 var(--outline-dark),
+      -4px  4px 0 var(--outline-dark),
+       0    4px 0 var(--outline-dark),
+       0   -4px 0 var(--outline-dark),
+       4px  0   0 var(--outline-dark),
+      -4px  0   0 var(--outline-dark),
+      /* Ombre portée */
+      8px 8px 0 rgba(0, 0, 0, 0.4);
+    /* Petit dégradé sur le texte pour simuler la 3D */
+    background:
+      linear-gradient(
+        180deg,
+        #FFF8C8 0%,
+        var(--n64-gold, #F0C040) 55%,
+        #A37010 100%
+      );
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    /* Et on double avec un text-shadow coloré sous le texte */
+    filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.45));
+  }
+  
+  .title__subtitle {
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(10px, 1.6vw, 14px);
+    letter-spacing: 4px;
+    color: var(--ui-text-light, #FFF8E0);
+    text-shadow: var(--shadow-text-small);
+    margin-top: 12px;
+    opacity: 0.9;
+  }
+  
+  @keyframes title-logo-float {
+    0%, 100% { transform: translate3d(-50%, -60%, 0) rotateX(0deg); }
+    50%      { transform: translate3d(-50%, -56%, 0) rotateX(-2deg); }
+  }
+  
+  /* ==========================================================================
+     PROMPT — "APPUYEZ SUR ENTRÉE"
+     ========================================================================== */
+  
+  .title__prompt {
+    position: absolute;
+    top: 75%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Press Start 2P', monospace;
+    font-size: clamp(12px, 2vw, 18px);
+    letter-spacing: 3px;
+    color: var(--ui-text-light, #FFF8E0);
+    text-shadow: var(--shadow-text);
+    padding: 10px 24px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-slow) var(--ease-out);
+  }
+  
+  .title__prompt.is-visible {
+    opacity: 1;
+    animation: title-prompt-blink 1.2s steps(2, end) infinite;
+  }
+  
+  @keyframes title-prompt-blink {
+    50% { opacity: 0.2; }
+  }
+  
+  /* ==========================================================================
+     CRÉDITS
+     ========================================================================== */
+  
+  .title__credits {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(255, 248, 224, 0.55);
+    pointer-events: none;
+  }
+  
+  /* ==========================================================================
+     CUBES ORBITANTS
+     ========================================================================== */
+  
+  .title__cubes {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-style: preserve-3d;
+    pointer-events: none;
+  }
+  
+  .title__cube-slot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+  
+  /* ==========================================================================
+     Responsive
+     ========================================================================== */
+  
+  @media (max-width: 768px) {
+    .title__logo {
+      letter-spacing: 3px;
+      text-shadow:
+        3px 3px 0 var(--outline-dark),
+        -3px -3px 0 var(--outline-dark),
+        3px -3px 0 var(--outline-dark),
+        -3px 3px 0 var(--outline-dark),
+        6px 6px 0 rgba(0, 0, 0, 0.4);
+    }
+    .title__subtitle {
+      letter-spacing: 2px;
+    }
+    .title__prompt {
+      top: 78%;
+      font-size: 12px;
+    }
+  }
+  
+  /* Reduced motion : on fige le logo et on remplace le blink par un simple contour */
+  @media (prefers-reduced-motion: reduce) {
+    .title__logo-wrap { animation: none !important; }
+    .title__prompt.is-visible { animation: none !important; opacity: 1; }
+  }
