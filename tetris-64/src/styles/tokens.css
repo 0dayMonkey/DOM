@@ -1,0 +1,176 @@
+/**
+ * tokens.css — Variables CSS globales (palette, tailles, timings)
+ *
+ * RÈGLE D'OR : ne jamais hardcoder de couleur, taille de cube, ou durée
+ * d'animation ailleurs que dans ce fichier. Tout ce qui est tuning visuel
+ * du jeu passe par des variables CSS définies ici.
+ */
+
+ :root {
+    /* ========================================================================
+       PIÈCES TETRIS — couleurs guideline, saturées N64
+       ======================================================================== */
+    --piece-i: #00E5E5;
+    --piece-o: #FFD500;
+    --piece-t: #B048E0;
+    --piece-s: #2DCC2D;
+    --piece-z: #E60012;
+    --piece-j: #0066CC;
+    --piece-l: #FF8800;
+  
+    /* Ghost piece : 25% opacité des couleurs pleines */
+    --ghost-alpha: 0.25;
+  
+    /* ========================================================================
+       UI N64
+       ======================================================================== */
+    --n64-red: #E60012;
+    --n64-blue: #0066CC;
+    --n64-yellow: #FFCC00;
+    --n64-green: #2DB92D;
+    --n64-gold: #F0C040;
+    --n64-cream: #FFF8E0;
+  
+    /* ========================================================================
+       SKYBOX — dégradé coucher de soleil N64
+       ======================================================================== */
+    --sky-top: #5A3A9E;
+    --sky-mid: #E0408C;
+    --sky-bot: #FFA840;
+  
+    /* ========================================================================
+       HUB CHÂTEAU
+       ======================================================================== */
+    --castle-wall: #F4E4BC;
+    --castle-floor-a: #F4E4BC;
+    --castle-floor-b: #C09060;
+    --castle-floor: #C09060;
+    --castle-trim: #8B4513;
+    --castle-carpet: #C8102E;
+    --castle-carpet-trim: #F0C040;
+    --castle-ceiling: #6A4A2A;
+  
+    /* ========================================================================
+       OUTLINES ET OMBRES
+       ======================================================================== */
+    --outline-dark: #1A1A2E;
+    --outline-width: 2px;
+    --shadow-hard: 2px 2px 0 var(--outline-dark);
+    --shadow-hard-big: 4px 4px 0 var(--outline-dark);
+    --shadow-text:
+      3px 3px 0 var(--outline-dark),
+      -1px -1px 0 var(--outline-dark),
+      1px -1px 0 var(--outline-dark),
+      -1px 1px 0 var(--outline-dark);
+    --shadow-text-small:
+      2px 2px 0 var(--outline-dark),
+      -1px -1px 0 var(--outline-dark),
+      1px -1px 0 var(--outline-dark),
+      -1px 1px 0 var(--outline-dark);
+  
+    /* ========================================================================
+       ÉCLAIRAGE DES CUBES
+       ======================================================================== */
+    --light-top: rgba(255, 255, 255, 0.35);
+    --light-side: rgba(0, 0, 0, 0.25);
+    --light-front: rgba(255, 255, 255, 0.05);
+  
+    /* ========================================================================
+       DIMENSIONS — pièces et board
+       ======================================================================== */
+    --cube-size: 32px;
+    --cube-depth: 16px;
+    --cube-size-small: 20px;
+    --cube-depth-small: 10px;
+  
+    --board-cols: 10;
+    --board-rows: 20;
+    --board-width: calc(var(--cube-size) * var(--board-cols));
+    --board-height: calc(var(--cube-size) * var(--board-rows));
+  
+    /* ========================================================================
+       DIMENSIONS — hub (unités logiques, 1 unité = 64px)
+       ======================================================================== */
+    --hub-unit: 64px;
+    --hub-floor-tile: 128px;
+    --hub-width: calc(var(--hub-unit) * 16);
+    --hub-depth: calc(var(--hub-unit) * 24);
+    --hub-wall-height: calc(var(--hub-unit) * 10);
+  
+    /* ========================================================================
+       CAMÉRA — perspective et positions
+       ======================================================================== */
+    --cam-perspective: 1200px;
+    --cam-x: 0px;
+    --cam-y: 0px;
+    --cam-z: 0px;
+    --cam-rx: 0deg;
+    --cam-ry: 0deg;
+    --cam-rz: 0deg;
+  
+    /* Shake secousse (offsets temporaires) */
+    --shake-x: 0px;
+    --shake-y: 0px;
+  
+    /* ========================================================================
+       TIMINGS
+       ======================================================================== */
+    --dur-instant: 80ms;
+    --dur-fast: 160ms;
+    --dur-med: 300ms;
+    --dur-slow: 600ms;
+    --dur-xslow: 1200ms;
+  
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-sharp: cubic-bezier(0.7, 0, 0.3, 1);
+  
+    /* ========================================================================
+       Z-INDEX
+       ======================================================================== */
+    --z-skybox: 0;
+    --z-world: 10;
+    --z-fog: 900;
+    --z-fx: 950;
+    --z-ui: 1000;
+    --z-hud: 1100;
+    --z-screen: 1200;
+    --z-transition: 1300;
+    --z-boot: 1400;
+  
+    /* ========================================================================
+       COULEURS UI génériques
+       ======================================================================== */
+    --ui-bg-dark: rgba(26, 26, 46, 0.85);
+    --ui-bg-panel: rgba(255, 248, 224, 0.95);
+    --ui-text-light: #FFF8E0;
+    --ui-text-dark: #1A1A2E;
+    --ui-accent: #F0C040;
+    --ui-danger: #E60012;
+  
+    /* ========================================================================
+       RESPONSIVE
+       ======================================================================== */
+    --breakpoint-mobile: 768px;
+  }
+  
+  /* Adaptation mobile : cubes un peu plus petits */
+  @media (max-width: 768px) {
+    :root {
+      --cube-size: 26px;
+      --cube-depth: 13px;
+      --cube-size-small: 16px;
+      --cube-depth-small: 8px;
+    }
+  }
+  
+  /* Préférence utilisateur : réduire les animations */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --dur-instant: 0ms;
+      --dur-fast: 0ms;
+      --dur-med: 80ms;
+      --dur-slow: 120ms;
+      --dur-xslow: 200ms;
+    }
+  }

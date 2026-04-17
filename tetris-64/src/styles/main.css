@@ -1,0 +1,295 @@
+/**
+ * main.css — Reset, layout racine, conteneurs globaux
+ */
+
+ *,
+ *::before,
+ *::after {
+   box-sizing: border-box;
+   margin: 0;
+   padding: 0;
+ }
+ 
+ html,
+ body {
+   width: 100%;
+   height: 100%;
+   overflow: hidden;
+   background: var(--outline-dark);
+   color: var(--ui-text-light);
+   -webkit-font-smoothing: antialiased;
+   -webkit-tap-highlight-color: transparent;
+   touch-action: none;
+   user-select: none;
+   -webkit-user-select: none;
+ }
+ 
+ body {
+   position: fixed;
+   inset: 0;
+ }
+ 
+ img,
+ svg {
+   display: block;
+   max-width: 100%;
+   pointer-events: none;
+ }
+ 
+ button {
+   font-family: inherit;
+   color: inherit;
+   background: none;
+   border: 0;
+   cursor: pointer;
+ }
+ 
+ /* ==========================================================================
+    Racine : viewport + world
+    ========================================================================== */
+ 
+ .viewport {
+   position: fixed;
+   inset: 0;
+   overflow: hidden;
+   perspective: var(--cam-perspective);
+   perspective-origin: 50% 50%;
+   background:
+     linear-gradient(
+       to bottom,
+       var(--sky-top) 0%,
+       var(--sky-mid) 55%,
+       var(--sky-bot) 100%
+     );
+ }
+ 
+ .scene-root {
+   position: absolute;
+   top: 50%;
+   left: 50%;
+   width: 0;
+   height: 0;
+   transform-style: preserve-3d;
+ }
+ 
+ .scene-root > * {
+   position: absolute;
+   transform-style: preserve-3d;
+ }
+ 
+ /* ==========================================================================
+    Overlays 2D (hors world 3D)
+    ========================================================================== */
+ 
+ .ui-overlay {
+   position: fixed;
+   inset: 0;
+   pointer-events: none;
+   z-index: var(--z-ui);
+ }
+ 
+ .ui-overlay > * {
+   pointer-events: auto;
+ }
+ 
+ .hud {
+   position: absolute;
+   top: 0;
+   left: 0;
+   right: 0;
+   bottom: 0;
+   pointer-events: none;
+   z-index: var(--z-hud);
+ }
+ 
+ .hud.hidden {
+   display: none;
+ }
+ 
+ .screens {
+   position: absolute;
+   inset: 0;
+   z-index: var(--z-screen);
+   pointer-events: none;
+ }
+ 
+ .screens > * {
+   pointer-events: auto;
+ }
+ 
+ .text-pop-layer {
+   position: absolute;
+   inset: 0;
+   pointer-events: none;
+   overflow: hidden;
+   z-index: var(--z-hud);
+ }
+ 
+ .fx-layer {
+   position: absolute;
+   top: 0;
+   left: 0;
+   width: 0;
+   height: 0;
+   transform-style: preserve-3d;
+   pointer-events: none;
+   z-index: var(--z-fx);
+ }
+ 
+ /* ==========================================================================
+    Transitions (fade / iris / star-wipe)
+    ========================================================================== */
+ 
+ .transition-overlay {
+   position: fixed;
+   inset: 0;
+   background: var(--outline-dark);
+   opacity: 0;
+   pointer-events: none;
+   z-index: var(--z-transition);
+   transition: opacity var(--dur-slow) var(--ease-sharp);
+ }
+ 
+ .transition-overlay.is-active {
+   pointer-events: auto;
+ }
+ 
+ .transition-overlay.fade-in {
+   opacity: 1;
+ }
+ 
+ .transition-overlay.flash-white {
+   background: #FFFFFF;
+   opacity: 1;
+   transition: opacity var(--dur-fast) var(--ease-sharp);
+ }
+ 
+ .transition-overlay.iris {
+   background: var(--outline-dark);
+   opacity: 1;
+   clip-path: circle(100% at 50% 50%);
+   transition: clip-path var(--dur-slow) var(--ease-sharp);
+ }
+ 
+ .transition-overlay.iris.closing {
+   clip-path: circle(0% at 50% 50%);
+ }
+ 
+ /* ==========================================================================
+    Boot loader (avant hydration)
+    ========================================================================== */
+ 
+ .boot-loader {
+   position: fixed;
+   inset: 0;
+   background: var(--outline-dark);
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   justify-content: center;
+   gap: 16px;
+   z-index: var(--z-boot);
+   transition: opacity var(--dur-slow) var(--ease-sharp);
+ }
+ 
+ .boot-loader.hidden {
+   opacity: 0;
+   pointer-events: none;
+ }
+ 
+ .boot-loader__text {
+   font-family: 'Lilita One', 'Press Start 2P', sans-serif;
+   font-size: clamp(32px, 8vw, 72px);
+   color: var(--n64-gold);
+   text-shadow: var(--shadow-text);
+   letter-spacing: 4px;
+ }
+ 
+ .boot-loader__sub {
+   font-family: 'Press Start 2P', monospace;
+   font-size: 12px;
+   color: var(--ui-text-light);
+   opacity: 0.7;
+   animation: boot-loader-blink 1s infinite steps(2, end);
+ }
+ 
+ @keyframes boot-loader-blink {
+   50% { opacity: 0; }
+ }
+ 
+ /* ==========================================================================
+    Bouton mute
+    ========================================================================== */
+ 
+ .mute-btn {
+   position: fixed;
+   top: 12px;
+   right: 12px;
+   width: 44px;
+   height: 44px;
+   background: var(--ui-bg-dark);
+   color: var(--ui-text-light);
+   border: 2px solid var(--outline-dark);
+   box-shadow: var(--shadow-hard);
+   font-size: 22px;
+   line-height: 1;
+   z-index: var(--z-boot);
+   transition: transform var(--dur-fast) var(--ease-out);
+ }
+ 
+ .mute-btn:hover,
+ .mute-btn:focus-visible {
+   transform: scale(1.1);
+ }
+ 
+ .mute-btn:active {
+   transform: scale(0.95);
+ }
+ 
+ .mute-btn.is-muted {
+   opacity: 0.5;
+ }
+ 
+ /* ==========================================================================
+    Noscript warning
+    ========================================================================== */
+ 
+ .noscript-warning {
+   position: fixed;
+   inset: 0;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   background: var(--outline-dark);
+   color: var(--n64-red);
+   font-family: 'Press Start 2P', monospace;
+   font-size: 14px;
+   text-align: center;
+   padding: 20px;
+   z-index: 9999;
+ }
+ 
+ /* ==========================================================================
+    Utilitaires génériques
+    ========================================================================== */
+ 
+ .hidden {
+   display: none !important;
+ }
+ 
+ .invisible {
+   visibility: hidden;
+   pointer-events: none;
+ }
+ 
+ .sr-only {
+   position: absolute;
+   width: 1px;
+   height: 1px;
+   padding: 0;
+   margin: -1px;
+   overflow: hidden;
+   clip: rect(0, 0, 0, 0);
+   white-space: nowrap;
+   border: 0;
+ }

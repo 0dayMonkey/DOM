@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1" />
+    <meta name="theme-color" content="#1A1A2E" />
+    <meta name="description" content="Tetris 64 — Un Tetris qui s'ouvre comme un jeu Nintendo 64 de 1996." />
+    <title>Tetris 64</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Press+Start+2P&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="/src/styles/tokens.css" />
+    <link rel="stylesheet" href="/src/styles/typography.css" />
+    <link rel="stylesheet" href="/src/styles/main.css" />
+    <link rel="stylesheet" href="/src/styles/scene3d.css" />
+    <link rel="stylesheet" href="/src/styles/pieces.css" />
+    <link rel="stylesheet" href="/src/styles/board.css" />
+    <link rel="stylesheet" href="/src/styles/hub.css" />
+    <link rel="stylesheet" href="/src/styles/character.css" />
+    <link rel="stylesheet" href="/src/styles/title.css" />
+    <link rel="stylesheet" href="/src/styles/ui.css" />
+    <link rel="stylesheet" href="/src/styles/animations.css" />
+  </head>
+  <body>
+    <!-- Viewport 3D : applique la perspective -->
+    <div id="viewport" class="viewport">
+      <!-- World : conteneur qui se déplace/tourne pour simuler la caméra -->
+      <div id="world" class="world">
+        <!-- Skybox : fond étoilé fixe -->
+        <div id="skybox" class="skybox" aria-hidden="true"></div>
+
+        <!-- Fog : overlay périphérique blanc -->
+        <div id="fog" class="fog" aria-hidden="true"></div>
+
+        <!-- Conteneur scène active (title / hub / game) -->
+        <div id="scene-root" class="scene-root"></div>
+
+        <!-- Conteneur particules et effets volatils -->
+        <div id="fx-layer" class="fx-layer" aria-hidden="true"></div>
+      </div>
+
+      <!-- UI overlay 2D : HUD, menus, prompts — hors du world 3D -->
+      <div id="ui-overlay" class="ui-overlay">
+        <div id="hud" class="hud hidden"></div>
+        <div id="screens" class="screens"></div>
+        <div id="text-pop-layer" class="text-pop-layer" aria-hidden="true"></div>
+      </div>
+
+      <!-- Overlay de transition (fade, iris, star-wipe) -->
+      <div id="transition-overlay" class="transition-overlay" aria-hidden="true"></div>
+    </div>
+
+    <!-- Indicateur de chargement initial -->
+    <div id="boot-loader" class="boot-loader">
+      <div class="boot-loader__text">TETRIS 64</div>
+      <div class="boot-loader__sub">Chargement...</div>
+    </div>
+
+    <!-- Bouton mute accessible (coin) -->
+    <button id="mute-btn" class="mute-btn" aria-label="Couper le son" type="button">♪</button>
+
+    <noscript>
+      <div class="noscript-warning">
+        Ce jeu nécessite JavaScript activé.
+      </div>
+    </noscript>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
