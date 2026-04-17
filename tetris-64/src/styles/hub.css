@@ -1,0 +1,401 @@
+/**
+ * hub.css — Salle du hub (sol, murs, plafond, tapis, piliers, paintings).
+ *
+ * Couleurs issues des tokens :
+ *   --castle-floor-a / --castle-floor-b : damier du sol
+ *   --castle-wall                       : murs crème
+ *   --castle-ceiling                    : plafond bois
+ *   --castle-trim                       : boiseries
+ *   --castle-carpet                     : tapis rouge
+ *   --n64-gold                          : cadres dorés des tableaux
+ */
+
+ .hub-scene {
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+  }
+  
+  .hub-map {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-style: preserve-3d;
+  }
+  
+  /* ==========================================================================
+     SOL — damier + tapis
+     ========================================================================== */
+  
+  .hub-map__floor {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-style: flat;
+    background:
+      conic-gradient(
+        from 0deg at 50% 50%,
+        var(--castle-floor-a, #F4E4BC) 0deg 90deg,
+        var(--castle-floor-b, #C09060) 90deg 180deg,
+        var(--castle-floor-a, #F4E4BC) 180deg 270deg,
+        var(--castle-floor-b, #C09060) 270deg 360deg
+      );
+    background-size: var(--hub-floor-tile, 128px) var(--hub-floor-tile, 128px);
+    background-repeat: repeat;
+    /* Dégradé radial d'ombrage pour donner de la profondeur */
+    box-shadow:
+      inset 0 0 220px rgba(0, 0, 0, 0.45);
+  }
+  
+  .hub-map__floor::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 40%,
+      rgba(0, 0, 0, 0.35) 90%
+    );
+    pointer-events: none;
+  }
+  
+  .hub-map__carpet {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-style: flat;
+    background:
+      linear-gradient(
+        90deg,
+        var(--castle-carpet-trim, #F0C040) 0%,
+        var(--castle-carpet-trim, #F0C040) 5%,
+        var(--castle-carpet, #C8102E) 5%,
+        var(--castle-carpet, #C8102E) 95%,
+        var(--castle-carpet-trim, #F0C040) 95%,
+        var(--castle-carpet-trim, #F0C040) 100%
+      );
+    box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.3);
+  }
+  
+  .hub-map__entry-rug {
+    position: absolute;
+    width: 240px;
+    height: 160px;
+    transform-style: flat;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        var(--castle-carpet, #C8102E) 0 20px,
+        color-mix(in srgb, var(--castle-carpet, #C8102E) 80%, black 20%) 20px 40px
+      );
+    border: 6px solid var(--castle-carpet-trim, #F0C040);
+    box-sizing: border-box;
+  }
+  
+  /* ==========================================================================
+     PLAFOND
+     ========================================================================== */
+  
+  .hub-map__ceiling {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-style: flat;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        var(--castle-ceiling, #6A4A2A) 0 40px,
+        color-mix(in srgb, var(--castle-ceiling, #6A4A2A) 70%, black 30%) 40px 80px
+      );
+    box-shadow: inset 0 0 200px rgba(0, 0, 0, 0.55);
+  }
+  
+  /* ==========================================================================
+     MURS
+     ========================================================================== */
+  
+  .hub-map__wall {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-style: flat;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--castle-wall, #F4E4BC) 100%, white 8%) 0%,
+        var(--castle-wall, #F4E4BC) 60%,
+        color-mix(in srgb, var(--castle-wall, #F4E4BC) 80%, black 20%) 100%
+      );
+    box-shadow:
+      inset 0 0 0 4px var(--castle-trim, #8B4513),
+      inset 0 0 80px rgba(0, 0, 0, 0.25);
+  }
+  
+  /* Plinthe et corniche : on utilise des pseudo-éléments */
+  .hub-map__wall::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 60px;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--castle-trim, #8B4513) 70%, white 30%) 0%,
+        var(--castle-trim, #8B4513) 100%
+      );
+    box-shadow: 0 -2px 0 var(--outline-dark, #1A1A2E);
+  }
+  
+  .hub-map__wall::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 32px;
+    background:
+      linear-gradient(
+        180deg,
+        var(--castle-trim, #8B4513) 0%,
+        color-mix(in srgb, var(--castle-trim, #8B4513) 60%, black 40%) 100%
+      );
+    box-shadow: 0 2px 0 var(--outline-dark, #1A1A2E);
+  }
+  
+  /* ==========================================================================
+     PILIERS
+     ========================================================================== */
+  
+  .hub-map__pillar {
+    position: absolute;
+    width: 60px;
+    top: 0;
+    transform-style: flat;
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--castle-wall, #F4E4BC) 80%, black 20%) 0%,
+        var(--castle-wall, #F4E4BC) 50%,
+        color-mix(in srgb, var(--castle-wall, #F4E4BC) 80%, black 20%) 100%
+      );
+    border: 2px solid var(--outline-dark, #1A1A2E);
+    box-shadow:
+      inset 2px 0 0 rgba(255, 255, 255, 0.3),
+      inset -2px 0 0 rgba(0, 0, 0, 0.3);
+  }
+  
+  .hub-map__pillar::before,
+  .hub-map__pillar::after {
+    content: "";
+    position: absolute;
+    left: -6px;
+    right: -6px;
+    height: 24px;
+    background:
+      linear-gradient(
+        180deg,
+        var(--castle-trim, #8B4513) 0%,
+        color-mix(in srgb, var(--castle-trim, #8B4513) 60%, black 40%) 100%
+      );
+    border: 2px solid var(--outline-dark, #1A1A2E);
+  }
+  
+  .hub-map__pillar::before { top: 0; }
+  .hub-map__pillar::after  { bottom: 0; }
+  
+  /* ==========================================================================
+     PAINTINGS (tableaux interactifs)
+     ========================================================================== */
+  
+  .paintings {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-style: preserve-3d;
+  }
+  
+  .painting {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-style: preserve-3d;
+    will-change: transform, filter;
+    transition: filter var(--dur-fast) var(--ease-out);
+  }
+  
+  .painting__frame {
+    position: absolute;
+    inset: -12px;
+    background:
+      linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--n64-gold, #F0C040) 100%, white 25%) 0%,
+        var(--n64-gold, #F0C040) 50%,
+        color-mix(in srgb, var(--n64-gold, #F0C040) 70%, black 30%) 100%
+      );
+    border: 3px solid var(--outline-dark, #1A1A2E);
+    box-shadow:
+      inset 0 0 0 2px rgba(255, 255, 255, 0.25),
+      var(--shadow-hard-big, 4px 4px 0 #1A1A2E);
+    transform: translate3d(0, 0, -2px);
+  }
+  
+  .painting__mat {
+    position: absolute;
+    inset: 0;
+    /* Couleur d'ambiance selon le mode */
+    background:
+      linear-gradient(
+        180deg,
+        #3B2A78 0%,
+        #6C3DB6 100%
+      );
+    border: 2px solid var(--outline-dark, #1A1A2E);
+    overflow: hidden;
+  }
+  
+  .painting__mat[data-mode="marathon"] {
+    background: linear-gradient(180deg, #3B2A78, #B048E0);
+  }
+  
+  .painting__mat[data-mode="sprint40"] {
+    background: linear-gradient(180deg, #154A8A, #2DB9E5);
+  }
+  
+  .painting__mat[data-mode="zen"] {
+    background: linear-gradient(180deg, #1E6A3A, #8CE07A);
+  }
+  
+  .painting__mat::before {
+    /* Halo lumineux + "ciel" intérieur */
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      ellipse at 50% 35%,
+      rgba(255, 255, 255, 0.25) 0%,
+      transparent 70%
+    );
+    pointer-events: none;
+  }
+  
+  .painting__stage {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  
+  .painting__piece-slot {
+    position: absolute;
+    top: 55%;
+    left: 50%;
+    transform-origin: center center;
+    transform-style: preserve-3d;
+  }
+  
+  .painting__plate {
+    position: absolute;
+    left: 50%;
+    bottom: -26px;
+    transform: translateX(-50%);
+    padding: 6px 18px;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--n64-gold, #F0C040) 100%, white 25%) 0%,
+        var(--n64-gold, #F0C040) 100%
+      );
+    color: var(--outline-dark, #1A1A2E);
+    font-family: 'Lilita One', 'Press Start 2P', sans-serif;
+    font-size: 16px;
+    letter-spacing: 2px;
+    border: 2px solid var(--outline-dark, #1A1A2E);
+    box-shadow: var(--shadow-hard, 2px 2px 0 #1A1A2E);
+    white-space: nowrap;
+  }
+  
+  .painting__halo {
+    position: absolute;
+    inset: -40px;
+    border-radius: 8px;
+    background: radial-gradient(
+      ellipse at center,
+      rgba(255, 224, 120, 0.55) 0%,
+      transparent 65%
+    );
+    opacity: 0;
+    transition: opacity var(--dur-med) var(--ease-out);
+    pointer-events: none;
+    transform: translate3d(0, 0, -4px);
+  }
+  
+  .painting.is-highlighted {
+    filter:
+      brightness(1.1)
+      drop-shadow(0 0 20px rgba(255, 224, 120, 0.7));
+    animation: painting-pulse 1.4s ease-in-out infinite;
+  }
+  
+  .painting.is-highlighted .painting__halo {
+    opacity: 1;
+  }
+  
+  @keyframes painting-pulse {
+    0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+    50%      { transform: translate3d(0, -6px, 12px) scale(1.02); }
+  }
+  
+  /* ==========================================================================
+     PROMPT "ENTRER DANS : …"
+     ========================================================================== */
+  
+  .hub__interact-prompt {
+    position: absolute;
+    left: 50%;
+    bottom: 12%;
+    transform: translateX(-50%);
+    padding: 10px 20px;
+    background: var(--ui-bg-dark);
+    color: var(--n64-gold, #F0C040);
+    font-family: 'Lilita One', 'Press Start 2P', sans-serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    border: 2px solid var(--outline-dark);
+    box-shadow: var(--shadow-hard);
+    opacity: 1;
+    transition: opacity var(--dur-fast) var(--ease-out),
+                transform var(--dur-fast) var(--ease-out);
+    animation: prompt-bob 1.6s ease-in-out infinite;
+  }
+  
+  .hub__interact-prompt.is-hidden {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+    pointer-events: none;
+  }
+  
+  @keyframes prompt-bob {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50%      { transform: translateX(-50%) translateY(-4px); }
+  }
+  
+  /* ==========================================================================
+     Responsive
+     ========================================================================== */
+  
+  @media (max-width: 768px) {
+    .painting__plate {
+      font-size: 12px;
+      padding: 4px 12px;
+    }
+    .hub__interact-prompt {
+      font-size: 14px;
+      padding: 8px 14px;
+    }
+  }

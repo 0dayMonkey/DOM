@@ -1,0 +1,342 @@
+/**
+ * scene3d.css — Perspective, world 3D, profondeur
+ *
+ * Règles CRITIQUES pour que le rendu 3D CSS fonctionne :
+ *  - .viewport a `perspective` : crée l'espace 3D
+ *  - tout conteneur qui reçoit des enfants 3D doit avoir `transform-style: preserve-3d`
+ *  - aucun parent intermédiaire ne doit avoir `overflow: hidden` sauf .viewport
+ *    (sinon les plans clippent et cassent la perspective)
+ */
+
+ .viewport {
+    transform-style: flat; /* .viewport est le plan 2D contenant l'espace 3D */
+  }
+  
+  .world {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    transform-style: preserve-3d;
+    /* La caméra écrit directement sur #world un transform inversé via JS */
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+  }
+  
+  /* ==========================================================================
+     Skybox — doit rester derrière tout le reste
+     ========================================================================== */
+  
+  .skybox {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    transform-origin: 50% 50%;
+    transform-style: flat;
+    pointer-events: none;
+    z-index: var(--z-skybox);
+    overflow: hidden;
+  }
+  
+  .skybox__stars {
+    position: absolute;
+    inset: -50vw -50vh;
+  }
+  
+  .skybox__star-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 2px;
+    height: 2px;
+    border-radius: 50%;
+    background: transparent;
+    /* box-shadow généré en JS par skybox.js */
+  }
+  
+  .skybox__horizon {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 25%;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(26, 26, 46, 0.35) 60%,
+      rgba(26, 26, 46, 0.7) 100%
+    );
+    pointer-events: none;
+  }
+  
+  /* ==========================================================================
+     Fog périphérique
+     ========================================================================== */
+  
+  .fog {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: var(--z-fog);
+    mix-blend-mode: normal;
+    /* Le gradient est écrit inline par fog.js */
+  }
+  
+  /* ==========================================================================
+     Scene root & scenes — utilitaires de profondeur
+     ========================================================================== */
+  
+  .scene-root {
+    z-index: var(--z-world);
+  }
+  
+  .scene-root > * {
+    backface-visibility: hidden;
+  }
+  
+  /* Chaque scène racine hérite de preserve-3d pour propager la profondeur */
+  .title-scene,
+  .hub-scene,
+  .game-scene {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-style: preserve-3d;
+    transform: translate3d(0, 0, 0);
+  }
+  
+  /* ==========================================================================
+     FX layer — dans le world 3D pour les particules spatiales
+     ========================================================================== */
+  
+  .fx-layer {
+    transform-style: preserve-3d;
+  }
+  
+  .particles-host {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+  }
+  
+  .particle {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    transform-origin: center center;
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+  }
+  
+  .particle--star {
+    /* Petite étoile : un carré tourné 45° + filtre */
+    border-radius: 0;
+    box-shadow: 0 0 6px currentColor;
+  }
+  
+  .particle--bar {
+    border-radius: 1px;
+  }
+  
+  .particle--circle {
+    border-radius: 50%;
+  }
+  
+  /* ==========================================================================
+     Cubes 3D — base partagée pour pieces + hub player + décors
+     ========================================================================== */
+  
+  .cube {
+    position: absolute;
+    width: var(--cube-size, 32px);
+    height: var(--cube-size, 32px);
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+  
+  .cube__face {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    border: var(--outline-width, 2px) solid var(--outline-dark, #1A1A2E);
+    box-sizing: border-box;
+  }
+  
+  /* Profondeur de chaque face : chaque cube a --cube-size appliqué dynamiquement */
+  .cube__face--front  { transform: translate3d(0, 0, calc(var(--cube-size) / 2)); }
+  .cube__face--back   { transform: translate3d(0, 0, calc(var(--cube-size) / -2)) rotateY(180deg); }
+  .cube__face--left   { transform: translate3d(calc(var(--cube-size) / -2), 0, 0) rotateY(-90deg);
+                        width: var(--cube-size); }
+  .cube__face--right  { transform: translate3d(calc(var(--cube-size) / 2), 0, 0) rotateY(90deg);
+                        width: var(--cube-size); }
+  .cube__face--top    { transform: translate3d(0, calc(var(--cube-size) / -2), 0) rotateX(90deg); }
+  .cube__face--bottom { transform: translate3d(0, calc(var(--cube-size) / 2), 0) rotateX(-90deg); }
+  
+  /* Version "flat" (top only) utilisée par NEXT/HOLD pour économiser le DOM */
+  .cube--flat {
+    transform-style: flat;
+  }
+  
+  .cube--flat .cube__face--top {
+    transform: none;
+    position: absolute;
+    inset: 0;
+  }
+  
+  /* ==========================================================================
+     Ghost piece
+     ========================================================================== */
+  
+  .cube--ghost .cube__face {
+    opacity: var(--ghost-alpha, 0.25);
+    background: transparent !important;
+    border-style: dashed;
+  }
+  
+  .cube--ghost .cube__face--top {
+    background: currentColor !important;
+    opacity: calc(var(--ghost-alpha, 0.25) * 1.2);
+  }
+  
+  .piece--ghost {
+    pointer-events: none;
+  }
+  
+  .piece--ghost.is-hidden {
+    display: none;
+  }
+  
+  /* ==========================================================================
+     Pièces : conteneur
+     ========================================================================== */
+  
+  .piece {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+  
+  .piece--centered {
+    position: relative;
+  }
+  
+  .piece--active {
+    z-index: 5;
+  }
+  
+  /* Pulsation pendant le lock delay */
+  .piece--locking .cube__face {
+    animation: piece-lock-pulse 0.4s ease-in-out infinite;
+  }
+  
+  @keyframes piece-lock-pulse {
+    0%, 100% { filter: brightness(1); }
+    50%      { filter: brightness(1.4); }
+  }
+  
+  /* ==========================================================================
+     Board layers
+     ========================================================================== */
+  
+  .board {
+    position: absolute;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+  
+  .board__floor,
+  .board__back-wall,
+  .board__locked,
+  .board__piece-layer,
+  .board__ghost-layer,
+  .board__fx-layer,
+  .board__frame {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+  }
+  
+  .board__cell {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  
+  /* Flash lignes en clearing */
+  .board__line-flash {
+    position: absolute;
+    left: 0;
+    background: #FFFFFF;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    animation: line-flash var(--dur-med, 300ms) ease-out forwards;
+    z-index: 3;
+  }
+  
+  @keyframes line-flash {
+    0%   { opacity: 0.9; transform: scaleY(1);    }
+    50%  { opacity: 0.6; transform: scaleY(1.15); }
+    100% { opacity: 0;   transform: scaleY(0.2);  }
+  }
+  
+  .board__cell--clearing {
+    animation: cell-clear var(--dur-med, 300ms) ease-in forwards;
+  }
+  
+  @keyframes cell-clear {
+    0%   { filter: brightness(1)   saturate(1); transform: translate3d(var(--clear-x, 0), var(--clear-y, 0), 0) scale(1); }
+    60%  { filter: brightness(3.2) saturate(2); }
+    100% { filter: brightness(0.5) saturate(0); transform: translate3d(var(--clear-x, 0), var(--clear-y, 0), 0) scale(0); opacity: 0; }
+  }
+  
+  /* ==========================================================================
+     Danger state (stack haute)
+     ========================================================================== */
+  
+  .board--danger .board__frame {
+    animation: danger-pulse 0.9s ease-in-out infinite;
+  }
+  
+  @keyframes danger-pulse {
+    0%, 100% { filter: brightness(1)   drop-shadow(0 0 0 transparent); }
+    50%      { filter: brightness(1.2) drop-shadow(0 0 12px rgba(230, 0, 18, 0.6)); }
+  }
+  
+  /* ==========================================================================
+     Transition overlay : iris et fade (support)
+     ========================================================================== */
+  
+  .transition-overlay.iris {
+    transition: clip-path var(--dur-slow, 600ms) var(--ease-sharp);
+  }
+  
+  /* ==========================================================================
+     Perspective mobile : on réduit la profondeur perçue
+     ========================================================================== */
+  
+  @media (max-width: 768px) {
+    .viewport {
+      perspective: 900px;
+    }
+  }
+  
+  /* Respect de prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    .piece--locking .cube__face,
+    .board--danger .board__frame {
+      animation: none !important;
+    }
+  }

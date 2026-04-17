@@ -1,0 +1,278 @@
+/**
+ * pieces.css — Couleurs et éclairage des 7 tétrominos.
+ *
+ * Chaque face d'un cube reçoit une teinte dérivée de la couleur de base
+ * de la pièce, via data-type="I|O|T|S|Z|J|L". Le schéma d'éclairage
+ * simule une lumière venant d'en haut à gauche :
+ *
+ *   - Top    : couleur + surbrillance (top light)
+ *   - Front  : couleur pleine (face principale vue en jeu)
+ *   - Left   : couleur assombrie (gauche éclairée)
+ *   - Right  : couleur encore plus sombre (droite dans l'ombre)
+ *   - Back   : sombre (invisible la plupart du temps)
+ *   - Bottom : très sombre (ombre portée)
+ *
+ * La désaturation du ghost et la pulsation lock sont gérées dans scene3d.css.
+ */
+
+ /* ==========================================================================
+    Couleur par type — variable locale --piece-color
+    ========================================================================== */
+ 
+    .cube[data-type="I"],
+    .piece[data-type="I"] { --piece-color: var(--piece-i); }
+    
+    .cube[data-type="O"],
+    .piece[data-type="O"] { --piece-color: var(--piece-o); }
+    
+    .cube[data-type="T"],
+    .piece[data-type="T"] { --piece-color: var(--piece-t); }
+    
+    .cube[data-type="S"],
+    .piece[data-type="S"] { --piece-color: var(--piece-s); }
+    
+    .cube[data-type="Z"],
+    .piece[data-type="Z"] { --piece-color: var(--piece-z); }
+    
+    .cube[data-type="J"],
+    .piece[data-type="J"] { --piece-color: var(--piece-j); }
+    
+    .cube[data-type="L"],
+    .piece[data-type="L"] { --piece-color: var(--piece-l); }
+    
+    /* Fallback : gris neutre pour cubes sans type (décor, hub player override) */
+    .cube:not([data-type]),
+    .cube[data-type=""] { --piece-color: #888; }
+    
+    /* ==========================================================================
+       Faces — éclairage dérivé de --piece-color
+       ========================================================================== */
+    
+    .cube__face--front {
+      background:
+        linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--piece-color) 100%, white 12%) 0%,
+          var(--piece-color) 55%,
+          color-mix(in srgb, var(--piece-color) 85%, black 15%) 100%
+        );
+    }
+    
+    .cube__face--top {
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--piece-color) 100%, white 30%) 0%,
+          color-mix(in srgb, var(--piece-color) 100%, white 14%) 100%
+        );
+    }
+    
+    .cube__face--left {
+      background:
+        linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--piece-color) 85%, black 15%) 0%,
+          color-mix(in srgb, var(--piece-color) 70%, black 30%) 100%
+        );
+    }
+    
+    .cube__face--right {
+      background:
+        linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--piece-color) 70%, black 30%) 0%,
+          color-mix(in srgb, var(--piece-color) 60%, black 40%) 100%
+        );
+    }
+    
+    .cube__face--back {
+      background:
+        color-mix(in srgb, var(--piece-color) 55%, black 45%);
+    }
+    
+    .cube__face--bottom {
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--piece-color) 60%, black 40%) 0%,
+          color-mix(in srgb, var(--piece-color) 40%, black 60%) 100%
+        );
+    }
+    
+    /* ==========================================================================
+       Détails lumineux : arêtes + highlight subtil
+       ========================================================================== */
+    
+    .cube__face--top::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 30%;
+      background: linear-gradient(
+        to bottom,
+        var(--light-top, rgba(255, 255, 255, 0.35)) 0%,
+        transparent 100%
+      );
+      pointer-events: none;
+    }
+    
+    .cube__face--front::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        ellipse at 30% 20%,
+        rgba(255, 255, 255, 0.18) 0%,
+        transparent 55%
+      );
+      pointer-events: none;
+    }
+    
+    /* ==========================================================================
+       Cube "flat" (top-only) : une seule face qui occupe toute la cellule
+       ========================================================================== */
+    
+    .cube--flat {
+      background: transparent;
+    }
+    
+    .cube--flat .cube__face--top {
+      background:
+        linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--piece-color) 100%, white 25%) 0%,
+          var(--piece-color) 55%,
+          color-mix(in srgb, var(--piece-color) 80%, black 20%) 100%
+        );
+      box-shadow:
+        inset 2px 2px 0 color-mix(in srgb, var(--piece-color) 100%, white 35%),
+        inset -2px -2px 0 color-mix(in srgb, var(--piece-color) 60%, black 40%);
+    }
+    
+    /* ==========================================================================
+       Spawn animation : petit pulse quand un cube apparaît
+       ========================================================================== */
+    
+    .cube--spawn-in {
+      animation: cube-spawn-in 0.22s var(--ease-bounce, cubic-bezier(.34, 1.56, .64, 1)) both;
+    }
+    
+    @keyframes cube-spawn-in {
+      0%   { transform: scale(0);   }
+      70%  { transform: scale(1.12); }
+      100% { transform: scale(1);   }
+    }
+    
+    /* Hard drop streak : léger flash étiré quand une pièce vient de s'abattre */
+    .cube--hard-drop {
+      animation: cube-hard-drop 0.28s ease-out both;
+    }
+    
+    @keyframes cube-hard-drop {
+      0%   { filter: brightness(2.2); }
+      100% { filter: brightness(1); }
+    }
+    
+    /* Rotation kick : léger "bump" quand une rotation SRS a utilisé un kick > 0 */
+    .cube--kick {
+      animation: cube-kick 0.18s ease-out both;
+    }
+    
+    @keyframes cube-kick {
+      0%   { filter: brightness(1.4) saturate(1.2); }
+      100% { filter: brightness(1)   saturate(1);   }
+    }
+    
+    /* ==========================================================================
+       Preview slots (NEXT, HOLD)
+       ========================================================================== */
+    
+    .preview__slot {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(26, 26, 46, 0.35);
+      border: 2px solid var(--outline-dark, #1A1A2E);
+      border-radius: 4px;
+      margin: 6px 0;
+      overflow: hidden;
+      transform-style: preserve-3d;
+      transition: transform var(--dur-fast) var(--ease-out),
+                  filter var(--dur-fast) var(--ease-out);
+    }
+    
+    .preview__slot.is-empty {
+      background: rgba(26, 26, 46, 0.55);
+    }
+    
+    .preview__slot.is-empty::before {
+      content: "—";
+      color: rgba(255, 248, 224, 0.35);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 18px;
+    }
+    
+    .preview__slot.is-shifting {
+      animation: preview-shift 0.24s var(--ease-out) both;
+    }
+    
+    @keyframes preview-shift {
+      0%   { transform: translateY(-8px) scale(0.96); filter: brightness(1.15); }
+      100% { transform: translateY(0)    scale(1);    filter: brightness(1);    }
+    }
+    
+    .preview__slot--primary {
+      border-color: var(--n64-gold, #F0C040);
+      box-shadow: inset 0 0 0 1px rgba(240, 192, 64, 0.4);
+    }
+    
+    .preview__slot--secondary {
+      transform: scale(0.85);
+      opacity: 0.85;
+    }
+    
+    .preview__slot.is-disabled {
+      filter: grayscale(0.9) brightness(0.6);
+    }
+    
+    .preview__slot.is-flashing {
+      animation: preview-flash 0.32s ease-out;
+    }
+    
+    @keyframes preview-flash {
+      0%   { filter: brightness(2.4); }
+      100% { filter: brightness(1);    }
+    }
+    
+    .preview__title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--ui-text-light);
+      text-shadow: var(--shadow-text-small);
+      margin-bottom: 2px;
+      text-align: center;
+    }
+    
+    .preview__list {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    /* ==========================================================================
+       Fallback : si color-mix n'est pas supporté (anciens navigateurs)
+       ========================================================================== */
+    
+    @supports not (background: color-mix(in srgb, red 50%, blue 50%)) {
+      .cube__face--front  { background: var(--piece-color); }
+      .cube__face--top    { background: var(--piece-color); filter: brightness(1.25); }
+      .cube__face--left   { background: var(--piece-color); filter: brightness(0.8); }
+      .cube__face--right  { background: var(--piece-color); filter: brightness(0.65); }
+      .cube__face--back   { background: var(--piece-color); filter: brightness(0.5); }
+      .cube__face--bottom { background: var(--piece-color); filter: brightness(0.4); }
+      .cube--flat .cube__face--top { background: var(--piece-color); filter: brightness(1.15); }
+    }
