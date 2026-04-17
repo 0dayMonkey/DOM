@@ -1,336 +1,166 @@
 /**
- * pieces.js — Définition des 7 tétrominos et de leurs 4 rotations.
+ * piece.js — Représentation d'une pièce active en jeu.
  *
- * Chaque pièce est représentée par ses 4 états de rotation (0, R, 2, L)
- * sous forme de listes de cellules occupées `{x, y}` dans une boîte locale.
+ * Une "active piece" est une pièce en cours de chute, avec :
+ *  - un type (I, O, T, S, Z, J, L)
+ *  - une position (x, y) du coin haut-gauche de sa boîte de rotation
+ *  - un état de rotation (0..3)
  *
- * Conventions :
- *  - Boîte I : 4x4 (rotations autour du centre 1.5, 1.5)
- *  - Boîte O : 2x2 (pas de rotation effective)
- *  - Boîte J/L/S/T/Z : 3x3 (rotations autour du centre 1, 1)
- *  - (x, y) = (colonne, ligne) dans la boîte locale ; y croît vers le bas
- *  - L'état 0 est l'état de spawn "standard" Tetris Guideline
+ * Ce module fournit un constructeur pur et des helpers pour dériver
+ * les cellules absolues, la pièce translatée, la pièce tournée, etc.
+ * Aucune collision n'est testée ici : c'est le rôle du moteur (game.js)
+ * en utilisant board.collides() + srs.tryRotate().
  *
- * Ce module est pur : pas d'import, pas d'effet de bord.
- * Toutes les structures sont figées avec Object.freeze.
+ * Module pur, immutable : chaque opération retourne une nouvelle pièce.
  */
 
-import { PIECE_TYPES, PIECE_ID } from './constants.js';
-
-// ============================================================================
-// DÉFINITION DES SHAPES — 4 rotations × 7 pièces
-// ============================================================================
+import { getAbsoluteCells, getPieceCells, getPieceId, getBoxSize } from './pieces.js';
+import { SPAWN_X, SPAWN_Y } from './constants.js';
 
 /**
- * Les shapes sont définies en "matrice binaire" (tableau 2D de 0/1), ce qui
- * est lisible et facile à éditer. Une fonction dérive ensuite la liste des
- * cellules occupées `{x, y}` utilisée par le moteur.
+ * @typedef {Object} ActivePiece
+ * @property {string} type        - 'I' | 'O' | 'T' | 'S' | 'Z' | 'J' | 'L'
+ * @property {number} x           - Colonne du coin haut-gauche de la boîte.
+ * @property {number} y           - Ligne du coin haut-gauche de la boîte.
+ * @property {number} rotation    - État de rotation (0..3).
+ * @property {number} id          - ID numérique (1..7) pour la grille.
+ */
+
+/**
+ * Crée une pièce active à sa position de spawn.
  *
- * @typedef {Array<Array<0|1>>} ShapeMatrix
- */
-
-/** @type {Record<string, ShapeMatrix[]>} */
-const SHAPE_MATRICES = {
-  I: [
-    // 0 : horizontale, ligne 1
-    [
-      [0, 0, 0, 0],
-      [1, 1, 1, 1],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-    ],
-    // R : verticale, colonne 2
-    [
-      [0, 0, 1, 0],
-      [0, 0, 1, 0],
-      [0, 0, 1, 0],
-      [0, 0, 1, 0],
-    ],
-    // 2 : horizontale, ligne 2
-    [
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-      [1, 1, 1, 1],
-      [0, 0, 0, 0],
-    ],
-    // L : verticale, colonne 1
-    [
-      [0, 1, 0, 0],
-      [0, 1, 0, 0],
-      [0, 1, 0, 0],
-      [0, 1, 0, 0],
-    ],
-  ],
-
-  O: [
-    // O n'a qu'une seule forme, dupliquée pour rester compatible avec le
-    // pipeline de rotation.
-    [
-      [0, 1, 1, 0],
-      [0, 1, 1, 0],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-    ],
-    [
-      [0, 1, 1, 0],
-      [0, 1, 1, 0],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-    ],
-    [
-      [0, 1, 1, 0],
-      [0, 1, 1, 0],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-    ],
-    [
-      [0, 1, 1, 0],
-      [0, 1, 1, 0],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-    ],
-  ],
-
-  T: [
-    [
-      [0, 1, 0],
-      [1, 1, 1],
-      [0, 0, 0],
-    ],
-    [
-      [0, 1, 0],
-      [0, 1, 1],
-      [0, 1, 0],
-    ],
-    [
-      [0, 0, 0],
-      [1, 1, 1],
-      [0, 1, 0],
-    ],
-    [
-      [0, 1, 0],
-      [1, 1, 0],
-      [0, 1, 0],
-    ],
-  ],
-
-  S: [
-    [
-      [0, 1, 1],
-      [1, 1, 0],
-      [0, 0, 0],
-    ],
-    [
-      [0, 1, 0],
-      [0, 1, 1],
-      [0, 0, 1],
-    ],
-    [
-      [0, 0, 0],
-      [0, 1, 1],
-      [1, 1, 0],
-    ],
-    [
-      [1, 0, 0],
-      [1, 1, 0],
-      [0, 1, 0],
-    ],
-  ],
-
-  Z: [
-    [
-      [1, 1, 0],
-      [0, 1, 1],
-      [0, 0, 0],
-    ],
-    [
-      [0, 0, 1],
-      [0, 1, 1],
-      [0, 1, 0],
-    ],
-    [
-      [0, 0, 0],
-      [1, 1, 0],
-      [0, 1, 1],
-    ],
-    [
-      [0, 1, 0],
-      [1, 1, 0],
-      [1, 0, 0],
-    ],
-  ],
-
-  J: [
-    [
-      [1, 0, 0],
-      [1, 1, 1],
-      [0, 0, 0],
-    ],
-    [
-      [0, 1, 1],
-      [0, 1, 0],
-      [0, 1, 0],
-    ],
-    [
-      [0, 0, 0],
-      [1, 1, 1],
-      [0, 0, 1],
-    ],
-    [
-      [0, 1, 0],
-      [0, 1, 0],
-      [1, 1, 0],
-    ],
-  ],
-
-  L: [
-    [
-      [0, 0, 1],
-      [1, 1, 1],
-      [0, 0, 0],
-    ],
-    [
-      [0, 1, 0],
-      [0, 1, 0],
-      [0, 1, 1],
-    ],
-    [
-      [0, 0, 0],
-      [1, 1, 1],
-      [1, 0, 0],
-    ],
-    [
-      [1, 1, 0],
-      [0, 1, 0],
-      [0, 1, 0],
-    ],
-  ],
-};
-
-// ============================================================================
-// DÉRIVATION : matrices → listes de cellules
-// ============================================================================
-
-/**
- * Convertit une matrice binaire en liste d'offsets `{x, y}`.
- * @param {ShapeMatrix} matrix
- * @returns {Array<{x: number, y: number}>}
- */
-function matrixToCells(matrix) {
-  const cells = [];
-  for (let y = 0; y < matrix.length; y++) {
-    const row = matrix[y];
-    for (let x = 0; x < row.length; x++) {
-      if (row[x] === 1) cells.push(Object.freeze({ x, y }));
-    }
-  }
-  return Object.freeze(cells);
-}
-
-/**
- * Taille de la boîte de rotation de chaque type.
- * @type {Readonly<Record<string, number>>}
- */
-export const PIECE_BOX_SIZE = Object.freeze({
-  I: 4,
-  O: 4,
-  T: 3,
-  S: 3,
-  Z: 3,
-  J: 3,
-  L: 3,
-});
-
-/**
- * Table finale : type → 4 rotations → cellules.
- * Gelée en profondeur.
- *
- * @type {Readonly<Record<string, ReadonlyArray<ReadonlyArray<{x:number,y:number}>>>>}
- */
-export const PIECES = Object.freeze(
-  PIECE_TYPES.reduce((acc, type) => {
-    const matrices = SHAPE_MATRICES[type];
-    const rotations = matrices.map(matrixToCells);
-    acc[type] = Object.freeze(rotations);
-    return acc;
-  }, /** @type {Record<string, unknown>} */ ({}))
-);
-
-/**
- * Table alternative : type → 4 rotations → matrice binaire brute (utile
- * pour le rendering ou le debug).
- */
-export const PIECE_MATRICES = Object.freeze(
-  PIECE_TYPES.reduce((acc, type) => {
-    acc[type] = Object.freeze(
-      SHAPE_MATRICES[type].map((m) => Object.freeze(m.map((row) => Object.freeze([...row]))))
-    );
-    return acc;
-  }, /** @type {Record<string, unknown>} */ ({}))
-);
-
-// ============================================================================
-// API PUBLIQUE
-// ============================================================================
-
-/**
- * Retourne les cellules occupées par une pièce dans une rotation donnée,
- * exprimées en coordonnées de la boîte locale (non translatées).
- *
- * @param {string} type - 'I' | 'O' | 'T' | 'S' | 'Z' | 'J' | 'L'
- * @param {number} rotation - 0..3
- * @returns {ReadonlyArray<{x:number, y:number}>}
- */
-export function getPieceCells(type, rotation) {
-  const rotations = PIECES[type];
-  if (!rotations) {
-    throw new Error(`pieces.getPieceCells: type inconnu "${type}"`);
-  }
-  const r = ((rotation % 4) + 4) % 4;
-  return rotations[r];
-}
-
-/**
- * Retourne les cellules absolues d'une pièce posée en (x, y) avec rotation r.
+ * Le spawn Tetris Guideline place les pièces horizontalement en haut du
+ * champ, centrées sur les colonnes 3–6 (pour les pièces 3-wide) ou 3–6
+ * (pour le I en 4-wide). Comme on utilise la même origine (coin haut-gauche
+ * de la boîte) pour toutes les pièces, SPAWN_X = 3 fonctionne correctement.
  *
  * @param {string} type
+ * @returns {ActivePiece}
+ */
+export function spawnPiece(type) {
+  return {
+    type,
+    x: SPAWN_X,
+    y: SPAWN_Y,
+    rotation: 0,
+    id: getPieceId(type),
+  };
+}
+
+/**
+ * Crée une pièce active à partir d'un état arbitraire.
+ * @param {string} type
+ * @param {number} x
+ * @param {number} y
  * @param {number} rotation
- * @param {number} x - colonne du coin haut-gauche de la boîte
- * @param {number} y - ligne du coin haut-gauche de la boîte
+ * @returns {ActivePiece}
+ */
+export function createPiece(type, x, y, rotation = 0) {
+  return {
+    type,
+    x,
+    y,
+    rotation: ((rotation % 4) + 4) % 4,
+    id: getPieceId(type),
+  };
+}
+
+/**
+ * Retourne les cellules absolues occupées par la pièce dans la grille.
+ * @param {ActivePiece} piece
  * @returns {Array<{x:number, y:number}>}
  */
-export function getAbsoluteCells(type, rotation, x, y) {
-  const local = getPieceCells(type, rotation);
-  const out = new Array(local.length);
-  for (let i = 0; i < local.length; i++) {
-    const c = local[i];
-    out[i] = { x: c.x + x, y: c.y + y };
-  }
-  return out;
+export function getCells(piece) {
+  return getAbsoluteCells(piece.type, piece.rotation, piece.x, piece.y);
 }
 
 /**
- * Retourne l'ID numérique stocké dans la grille pour un type de pièce.
- * @param {string} type
- * @returns {number}
+ * Retourne les cellules locales (dans la boîte de rotation, non translatées).
+ * @param {ActivePiece} piece
+ * @returns {ReadonlyArray<{x:number, y:number}>}
  */
-export function getPieceId(type) {
-  const id = PIECE_ID[type];
-  if (id === undefined) {
-    throw new Error(`pieces.getPieceId: type inconnu "${type}"`);
-  }
-  return id;
+export function getLocalCells(piece) {
+  return getPieceCells(piece.type, piece.rotation);
 }
 
 /**
- * Retourne la taille de la boîte de rotation d'une pièce (3 ou 4).
- * @param {string} type
+ * Retourne la taille de la boîte de rotation (3 pour JLSTZ, 4 pour I/O).
+ * @param {ActivePiece} piece
  * @returns {number}
  */
-export function getBoxSize(type) {
-  const size = PIECE_BOX_SIZE[type];
-  if (size === undefined) {
-    throw new Error(`pieces.getBoxSize: type inconnu "${type}"`);
+export function getPieceBoxSize(piece) {
+  return getBoxSize(piece.type);
+}
+
+/**
+ * Translation : déplace la pièce de (dx, dy) sans vérifier les collisions.
+ * @param {ActivePiece} piece
+ * @param {number} dx
+ * @param {number} dy
+ * @returns {ActivePiece}
+ */
+export function translate(piece, dx, dy) {
+  return {
+    ...piece,
+    x: piece.x + dx,
+    y: piece.y + dy,
+  };
+}
+
+/**
+ * Rotation : incrémente l'état de rotation de `steps` (±1 ou ±2).
+ * N'applique PAS les kicks SRS : c'est le rôle de srs.tryRotate().
+ * @param {ActivePiece} piece
+ * @param {number} steps
+ * @returns {ActivePiece}
+ */
+export function rotate(piece, steps) {
+  const nextRot = ((piece.rotation + steps) % 4 + 4) % 4;
+  return {
+    ...piece,
+    rotation: nextRot,
+  };
+}
+
+/**
+ * Retourne le rectangle englobant (en coordonnées absolues) des cellules
+ * occupées par la pièce. Utile pour le rendu et le debug.
+ * @param {ActivePiece} piece
+ * @returns {{minX:number, maxX:number, minY:number, maxY:number}}
+ */
+export function getBounds(piece) {
+  const cells = getCells(piece);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < cells.length; i++) {
+    const { x, y } = cells[i];
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
   }
-  return size;
+  return { minX, maxX, minY, maxY };
+}
+
+/**
+ * Clone superficiel (utile pour simulations).
+ * @param {ActivePiece} piece
+ * @returns {ActivePiece}
+ */
+export function clonePiece(piece) {
+  return { ...piece };
+}
+
+/**
+ * Égalité structurelle entre deux pièces (pour tests et diffing).
+ * @param {ActivePiece} a
+ * @param {ActivePiece} b
+ * @returns {boolean}
+ */
+export function piecesEqual(a, b) {
+  return (
+    a.type === b.type &&
+    a.x === b.x &&
+    a.y === b.y &&
+    a.rotation === b.rotation
+  );
 }
