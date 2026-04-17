@@ -1,0 +1,228 @@
+/**
+ * character.css — Personnage du hub (mascotte-cube).
+ *
+ * Le joueur est un petit personnage stylisé N64 composé de 2 cubes empilés :
+ *   - un CORPS carré au sol (couleur rouge N64 par défaut)
+ *   - une TÊTE posée dessus (plus petite, crème avec deux yeux)
+ *   - une OMBRE ovale au sol (non-3D, posée à plat)
+ *
+ * Les deux cubes sont de vrais cubes CSS 3D (6 faces) pour qu'ils réagissent
+ * correctement aux rotations de la caméra et aux effets de punch.
+ *
+ * Le bob de marche est géré en JS (player.js) via un translateY sur
+ * .hub-player__body-wrap ; le CSS ne contient que les couleurs et les
+ * animations "idle" (cligner des yeux, léger flottement au repos).
+ */
+
+ .hub-player {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-style: preserve-3d;
+    will-change: transform;
+    pointer-events: none;
+    /* Dimensions logiques (hors scale) : corps ≈ 80px cube, tête ≈ 60px cube */
+    --char-body-size: 80px;
+    --char-head-size: 60px;
+    --char-body-color: var(--n64-red, #E60012);
+    --char-head-color: #FFE8C8;
+    --char-eye-color: var(--outline-dark, #1A1A2E);
+  }
+  
+  /* ==========================================================================
+     OMBRE AU SOL
+     ========================================================================== */
+  
+  .hub-player__shadow {
+    position: absolute;
+    top: -2px;
+    left: -60px;
+    width: 120px;
+    height: 40px;
+    background: radial-gradient(
+      ellipse at center,
+      rgba(0, 0, 0, 0.55) 0%,
+      rgba(0, 0, 0, 0.2) 55%,
+      transparent 100%
+    );
+    transform: rotateX(90deg);
+    transform-origin: 50% 50%;
+    filter: blur(2px);
+    pointer-events: none;
+  }
+  
+  /* ==========================================================================
+     CORPS + TÊTE — wrappers
+     ========================================================================== */
+  
+  .hub-player__body-wrap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-style: preserve-3d;
+    will-change: transform;
+    animation: player-idle 2.4s ease-in-out infinite;
+  }
+  
+  .hub-player__body,
+  .hub-player__head {
+    position: absolute;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+  
+  .hub-player__body {
+    width: var(--char-body-size);
+    height: var(--char-body-size);
+    /* Le corps est centré horizontalement sur (0,0) et son bas posé au sol. */
+    top: calc(var(--char-body-size) * -1);
+    left: calc(var(--char-body-size) / -2);
+  }
+  
+  .hub-player__head {
+    width: var(--char-head-size);
+    height: var(--char-head-size);
+    /* La tête est juste au-dessus du corps, centrée horizontalement. */
+    top: calc((var(--char-body-size) + var(--char-head-size)) * -1 + 2px);
+    left: calc(var(--char-head-size) / -2);
+  }
+  
+  /* ==========================================================================
+     FACES — 6 par cube
+     ========================================================================== */
+  
+  .hub-player__face {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: var(--outline-width, 2px) solid var(--outline-dark, #1A1A2E);
+    box-sizing: border-box;
+    backface-visibility: hidden;
+  }
+  
+  /* Corps */
+  .hub-player__body .hub-player__face {
+    background:
+      linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--char-body-color) 100%, white 15%) 0%,
+        var(--char-body-color) 60%,
+        color-mix(in srgb, var(--char-body-color) 80%, black 20%) 100%
+      );
+  }
+  .hub-player__body .hub-player__face--front  { transform: translate3d(0, 0, calc(var(--char-body-size) / 2)); }
+  .hub-player__body .hub-player__face--back   { transform: translate3d(0, 0, calc(var(--char-body-size) / -2)) rotateY(180deg); }
+  .hub-player__body .hub-player__face--left   { transform: translate3d(calc(var(--char-body-size) / -2), 0, 0) rotateY(-90deg); width: var(--char-body-size); }
+  .hub-player__body .hub-player__face--right  { transform: translate3d(calc(var(--char-body-size) / 2), 0, 0) rotateY(90deg);  width: var(--char-body-size); }
+  .hub-player__body .hub-player__face--top    { transform: translate3d(0, calc(var(--char-body-size) / -2), 0) rotateX(90deg);
+                                                 background: linear-gradient(180deg, color-mix(in srgb, var(--char-body-color) 100%, white 30%) 0%, var(--char-body-color) 100%); }
+  .hub-player__body .hub-player__face--bottom { transform: translate3d(0, calc(var(--char-body-size) / 2), 0) rotateX(-90deg);
+                                                 background: color-mix(in srgb, var(--char-body-color) 50%, black 50%); }
+  
+  /* Tête */
+  .hub-player__head .hub-player__face {
+    background:
+      linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--char-head-color) 100%, white 15%) 0%,
+        var(--char-head-color) 60%,
+        color-mix(in srgb, var(--char-head-color) 80%, black 15%) 100%
+      );
+  }
+  .hub-player__head .hub-player__face--front  { transform: translate3d(0, 0, calc(var(--char-head-size) / 2)); }
+  .hub-player__head .hub-player__face--back   { transform: translate3d(0, 0, calc(var(--char-head-size) / -2)) rotateY(180deg); }
+  .hub-player__head .hub-player__face--left   { transform: translate3d(calc(var(--char-head-size) / -2), 0, 0) rotateY(-90deg); width: var(--char-head-size); }
+  .hub-player__head .hub-player__face--right  { transform: translate3d(calc(var(--char-head-size) / 2), 0, 0) rotateY(90deg);  width: var(--char-head-size); }
+  .hub-player__head .hub-player__face--top    { transform: translate3d(0, calc(var(--char-head-size) / -2), 0) rotateX(90deg);
+                                                 background: linear-gradient(180deg, color-mix(in srgb, var(--char-head-color) 100%, white 30%) 0%, var(--char-head-color) 100%); }
+  .hub-player__head .hub-player__face--bottom { transform: translate3d(0, calc(var(--char-head-size) / 2), 0) rotateX(-90deg);
+                                                 background: color-mix(in srgb, var(--char-head-color) 50%, black 50%); }
+  
+  /* ==========================================================================
+     YEUX (collés sur la face avant de la tête)
+     ========================================================================== */
+  
+  .hub-player__eyes {
+    position: absolute;
+    top: 40%;
+    left: 18%;
+    right: 18%;
+    display: flex;
+    justify-content: space-between;
+    /* Se colle devant la face --front */
+    transform: translate3d(0, 0, calc(var(--char-head-size) / 2 + 0.5px));
+    pointer-events: none;
+  }
+  
+  .hub-player__eye {
+    width: 8px;
+    height: 10px;
+    background: var(--char-eye-color);
+    border-radius: 2px;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
+    animation: player-blink 5s infinite;
+    transform-origin: center center;
+  }
+  
+  /* Décalage de l'œil droit pour que le clignement ne soit pas synchronisé
+     à 100% (petit effet d'asymétrie, détail N64) */
+  .hub-player__eye--right {
+    animation-delay: 0.1s;
+  }
+  
+  @keyframes player-blink {
+    0%, 92%, 100% { transform: scaleY(1); }
+    94%           { transform: scaleY(0.1); }
+    96%           { transform: scaleY(1); }
+  }
+  
+  /* ==========================================================================
+     Idle / walk animations
+     ========================================================================== */
+  
+  @keyframes player-idle {
+    0%, 100% { transform: translate3d(0, 0, 0); }
+    50%      { transform: translate3d(0, -4px, 0); }
+  }
+  
+  /* Quand le joueur bouge activement, le JS applique cette classe : on arrête
+     l'animation idle (le bob est calculé en JS pour rester synchro avec les
+     footsteps). */
+  .hub-player.is-walking .hub-player__body-wrap {
+    animation: none;
+  }
+  
+  /* Spawn : petit "pop" quand le joueur apparaît dans le hub */
+  .hub-player--spawn-in {
+    animation: player-spawn-in 0.45s var(--ease-bounce) both;
+  }
+  
+  @keyframes player-spawn-in {
+    0%   { transform: scale(0)    translateY(40px); opacity: 0; }
+    70%  { transform: scale(1.15) translateY(0);    opacity: 1; }
+    100% { transform: scale(1)    translateY(0);    opacity: 1; }
+  }
+  
+  /* ==========================================================================
+     Responsive — on réduit la taille du personnage sur mobile
+     ========================================================================== */
+  
+  @media (max-width: 768px) {
+    .hub-player {
+      --char-body-size: 64px;
+      --char-head-size: 48px;
+    }
+    .hub-player__shadow {
+      width: 100px;
+      height: 32px;
+      left: -50px;
+    }
+  }
+  
+  /* Reduced motion : pas d'idle ni de clignement */
+  @media (prefers-reduced-motion: reduce) {
+    .hub-player__body-wrap { animation: none !important; }
+    .hub-player__eye       { animation: none !important; }
+  }

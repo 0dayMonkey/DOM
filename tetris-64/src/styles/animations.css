@@ -1,0 +1,240 @@
+/**
+ * animations.css — Keyframes partagées et utilitaires d'animation.
+ *
+ * Ce fichier centralise les keyframes réutilisables par plusieurs composants
+ * (gameplay, UI, FX). Les animations "locales" à un composant restent dans
+ * son propre fichier CSS (ex : painting-pulse dans hub.css).
+ *
+ * Toutes les animations respectent prefers-reduced-motion : si l'utilisateur
+ * a activé la réduction de mouvement, les durées sont ramenées à 0ms
+ * (géré dans tokens.css), et les animations continues sont désactivées
+ * via la media query à la fin de ce fichier.
+ */
+
+ /* ==========================================================================
+    FADE
+    ========================================================================== */
+ 
+    @keyframes fade-in {
+        0%   { opacity: 0; }
+        100% { opacity: 1; }
+      }
+      
+      @keyframes fade-out {
+        0%   { opacity: 1; }
+        100% { opacity: 0; }
+      }
+      
+      @keyframes fade-in-up {
+        0%   { opacity: 0; transform: translateY(16px); }
+        100% { opacity: 1; transform: translateY(0);    }
+      }
+      
+      @keyframes fade-in-down {
+        0%   { opacity: 0; transform: translateY(-16px); }
+        100% { opacity: 1; transform: translateY(0);     }
+      }
+      
+      @keyframes fade-in-scale {
+        0%   { opacity: 0; transform: scale(0.85); }
+        100% { opacity: 1; transform: scale(1);    }
+      }
+      
+      /* ==========================================================================
+         PULSE / BOUNCE
+         ========================================================================== */
+      
+      @keyframes pulse {
+        0%, 100% { transform: scale(1);    }
+        50%      { transform: scale(1.05); }
+      }
+      
+      @keyframes pulse-strong {
+        0%, 100% { transform: scale(1);    filter: brightness(1);   }
+        50%      { transform: scale(1.15); filter: brightness(1.3); }
+      }
+      
+      @keyframes bounce {
+        0%, 100% { transform: translateY(0);    }
+        50%      { transform: translateY(-10px); }
+      }
+      
+      @keyframes bob {
+        0%, 100% { transform: translateY(0);   }
+        50%      { transform: translateY(-4px); }
+      }
+      
+      /* ==========================================================================
+         SHAKE
+         ========================================================================== */
+      
+      @keyframes shake-x {
+        0%, 100% { transform: translateX(0); }
+        20%      { transform: translateX(-4px); }
+        40%      { transform: translateX(4px); }
+        60%      { transform: translateX(-3px); }
+        80%      { transform: translateX(3px); }
+      }
+      
+      @keyframes shake-xy {
+        0%, 100% { transform: translate(0, 0); }
+        10%      { transform: translate(-2px, 1px); }
+        30%      { transform: translate(3px, -2px); }
+        50%      { transform: translate(-3px, 2px); }
+        70%      { transform: translate(2px, -1px); }
+        90%      { transform: translate(-1px, 1px); }
+      }
+      
+      /* ==========================================================================
+         FLASH
+         ========================================================================== */
+      
+      @keyframes flash-white {
+        0%   { background: rgba(255, 255, 255, 0.6); }
+        100% { background: rgba(255, 255, 255, 0);   }
+      }
+      
+      @keyframes flash-brightness {
+        0%   { filter: brightness(2.5); }
+        100% { filter: brightness(1);   }
+      }
+      
+      @keyframes flash-color {
+        0%   { filter: hue-rotate(0deg)  saturate(2); }
+        50%  { filter: hue-rotate(90deg) saturate(3); }
+        100% { filter: hue-rotate(0deg)  saturate(1); }
+      }
+      
+      /* ==========================================================================
+         BLINK (pour prompts / indicateurs clignotants)
+         ========================================================================== */
+      
+      @keyframes blink {
+        0%, 50%, 100% { opacity: 1;    }
+        25%, 75%      { opacity: 0.15; }
+      }
+      
+      @keyframes blink-hard {
+        0%, 49%   { opacity: 1; }
+        50%, 100% { opacity: 0; }
+      }
+      
+      /* ==========================================================================
+         ROTATION
+         ========================================================================== */
+      
+      @keyframes spin-y {
+        0%   { transform: rotateY(0deg);   }
+        100% { transform: rotateY(360deg); }
+      }
+      
+      @keyframes spin-slow {
+        0%   { transform: rotate(0deg);   }
+        100% { transform: rotate(360deg); }
+      }
+      
+      @keyframes wobble {
+        0%, 100% { transform: rotateZ(0deg);  }
+        25%      { transform: rotateZ(-3deg); }
+        75%      { transform: rotateZ(3deg);  }
+      }
+      
+      /* ==========================================================================
+         ENTRY (spawn d'élements UI)
+         ========================================================================== */
+      
+      @keyframes slide-in-left {
+        0%   { opacity: 0; transform: translateX(-40px); }
+        100% { opacity: 1; transform: translateX(0);    }
+      }
+      
+      @keyframes slide-in-right {
+        0%   { opacity: 0; transform: translateX(40px); }
+        100% { opacity: 1; transform: translateX(0);   }
+      }
+      
+      @keyframes slide-in-top {
+        0%   { opacity: 0; transform: translateY(-40px); }
+        100% { opacity: 1; transform: translateY(0);    }
+      }
+      
+      @keyframes slide-in-bottom {
+        0%   { opacity: 0; transform: translateY(40px); }
+        100% { opacity: 1; transform: translateY(0);   }
+      }
+      
+      /* ==========================================================================
+         CLASSES UTILITAIRES — appliquer directement sur un élément
+         ========================================================================== */
+      
+      .anim-fade-in      { animation: fade-in      var(--dur-med)  var(--ease-out)  both; }
+      .anim-fade-in-up   { animation: fade-in-up   var(--dur-med)  var(--ease-out)  both; }
+      .anim-fade-in-down { animation: fade-in-down var(--dur-med)  var(--ease-out)  both; }
+      .anim-fade-in-scale{ animation: fade-in-scale var(--dur-med) var(--ease-bounce) both; }
+      .anim-fade-out     { animation: fade-out     var(--dur-med)  var(--ease-sharp) both; }
+      
+      .anim-slide-left   { animation: slide-in-left   var(--dur-med) var(--ease-out) both; }
+      .anim-slide-right  { animation: slide-in-right  var(--dur-med) var(--ease-out) both; }
+      .anim-slide-top    { animation: slide-in-top    var(--dur-med) var(--ease-out) both; }
+      .anim-slide-bottom { animation: slide-in-bottom var(--dur-med) var(--ease-out) both; }
+      
+      .anim-pulse         { animation: pulse        1.4s ease-in-out infinite; }
+      .anim-pulse-strong  { animation: pulse-strong 0.8s ease-in-out infinite; }
+      .anim-bounce        { animation: bounce       1.2s ease-in-out infinite; }
+      .anim-bob           { animation: bob          1.6s ease-in-out infinite; }
+      
+      .anim-shake         { animation: shake-x  0.4s linear; }
+      .anim-shake-xy      { animation: shake-xy 0.5s linear; }
+      
+      .anim-flash         { animation: flash-brightness var(--dur-fast) ease-out; }
+      .anim-flash-white   { animation: flash-white      var(--dur-fast) ease-out; }
+      .anim-flash-color   { animation: flash-color      var(--dur-med)  ease-in-out; }
+      
+      .anim-blink         { animation: blink      1.2s steps(3, end)  infinite; }
+      .anim-blink-hard    { animation: blink-hard 1.0s steps(2, end)  infinite; }
+      
+      .anim-spin          { animation: spin-slow  8s linear infinite; }
+      .anim-wobble        { animation: wobble     1.2s ease-in-out infinite; }
+      
+      /* Durées alternatives : suffixes --fast / --slow */
+      .anim--fast { animation-duration: var(--dur-fast) !important; }
+      .anim--slow { animation-duration: var(--dur-slow) !important; }
+      
+      /* État "paused" (utile pour mettre en pause toutes les anims d'un sous-arbre) */
+      .anim-paused,
+      .anim-paused * {
+        animation-play-state: paused !important;
+      }
+      
+      /* ==========================================================================
+         REDUCED MOTION
+         ========================================================================== */
+      
+      @media (prefers-reduced-motion: reduce) {
+        /* On conserve les fades très courts pour que les écrans n'apparaissent
+           pas "d'un coup" (ça serait plus agressif que de les animer), mais on
+           désactive toutes les animations en boucle. */
+      
+        .anim-pulse,
+        .anim-pulse-strong,
+        .anim-bounce,
+        .anim-bob,
+        .anim-blink,
+        .anim-blink-hard,
+        .anim-spin,
+        .anim-wobble {
+          animation: none !important;
+        }
+      
+        /* Pour les entrées animées, on accélère à presque-instantané. */
+        .anim-fade-in,
+        .anim-fade-in-up,
+        .anim-fade-in-down,
+        .anim-fade-in-scale,
+        .anim-slide-left,
+        .anim-slide-right,
+        .anim-slide-top,
+        .anim-slide-bottom {
+          animation-duration: var(--dur-fast) !important;
+        }
+      }
