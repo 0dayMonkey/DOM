@@ -91,9 +91,11 @@ export function createHubMap(options) {
   floor.style.width = `${width}px`;
   floor.style.height = `${depth}px`;
   floor.style.transform =
-    `translate3d(${-width / 2}px, 0px, ${-depth / 2}px) rotateX(90deg)`;
+    `translate3d(${-width / 2}px, -1000px, 0px) rotateX(90deg)`;
   root.appendChild(floor);
   }
+
+  const deco = mapData?.decorations ?? {};
 
   if (deco.centerCarpet) {
 
@@ -116,20 +118,23 @@ export function createHubMap(options) {
   ceiling.style.width = `${width}px`;
   ceiling.style.height = `${depth}px`;
   ceiling.style.transform =
-    `translate3d(${-width / 2}px, ${-wallHeight}px, ${-depth / 2}px) rotateX(-90deg)`;
+    `translate3d(${-width / 2}px, ${-wallHeight-1000}px, ${-depth / 2}px) rotateX(-90deg)`;
   root.appendChild(ceiling);
   }
   // -------------------------------------------------------------------
   // MURS — générés depuis mapData.walls ou par défaut
   // -------------------------------------------------------------------
 
-  
   const wallsData = (mapData?.walls && mapData.walls.length > 0)
     ? mapData.walls
     : defaultRectangleWalls(width, depth);
 
-  wallsData.forEach((seg) => buildWallSegment(root, seg, wallHeight));
-
+  // Rendu visuel : on skippe les murs avec visible === false
+  // (la collision utilisera getWalls() qui retourne TOUS les segments)
+  wallsData.forEach((seg) => {
+    if (seg.visible === false) return;
+    buildWallSegment(root, seg, wallHeight);
+  });
 
   const entryRug = el('div', { class: 'hub-map__entry-rug' });
   entryRug.style.transform =
