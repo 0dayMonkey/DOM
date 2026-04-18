@@ -13,6 +13,11 @@
  *       WIN            → fanfare + écran sprint result
  *   - Gère la pause (ESC / P), l'écran game over, la victoire sprint.
  *
+ * Les écrans de fin (game over, sprint result) exposent trois choix :
+ *   REJOUER  → relance la même scène avec le même mode
+ *   HUB      → retour au hub (choisir un autre mode)
+ *   QUITTER  → retour au titre
+ *
  * Ce fichier est le plus gros du projet : c'est le "glue code" entre
  * le moteur pur et l'expérience utilisateur.
  */
@@ -505,11 +510,7 @@ import {
         timeMs: s.elapsedMs,
         rank,
       });
-      resultHandle.on('select', (choice) => {
-        const label = String(choice.label || '').toUpperCase();
-        if (label.includes('REJOUER')) restart();
-        else quit();
-      });
+      resultHandle.on('select', (choice) => handleResultChoice(choice));
     }
   
     /**
@@ -539,11 +540,25 @@ import {
         newRecord,
         previousBestMs: prev?.timeMs,
       });
-      resultHandle.on('select', (choice) => {
-        const label = String(choice.label || '').toUpperCase();
-        if (label.includes('REJOUER')) restart();
-        else quit();
-      });
+      resultHandle.on('select', (choice) => handleResultChoice(choice));
+    }
+  
+    /**
+     * Route le choix de l'écran de fin (game over / sprint result) vers
+     * la transition correspondante. Les labels possibles sont :
+     *   REJOUER  → relancer la même scène avec le même mode
+     *   HUB      → retour au hub Mario 64-style
+     *   QUITTER  → retour à l'écran titre
+     *
+     * Factorisation DRY pour éviter de dupliquer le routage entre
+     * handleGameOver et handleWin.
+     * @param {{label:string, index:number}} choice
+     */
+    function handleResultChoice(choice) {
+      const label = String(choice.label || '').toUpperCase();
+      if (label.includes('REJOUER')) restart();
+      else if (label.includes('HUB')) returnToHub();
+      else quit();
     }
   
     // ==================================================================
@@ -555,6 +570,17 @@ import {
       if (resultHandle) { try { resultHandle.close(); } catch (_) {} resultHandle = null; }
       closePauseMenu();
       await ctx.switchTo(SCENES.GAME, { transition: 'fade', params: { mode } });
+    }
+  
+    /**
+     * Retour au hub Mario 64-style. Même pattern que restart()/quit() :
+     * on ferme proprement les handles d'UI puis on switche de scène.
+     */
+    async function returnToHub() {
+      if (!ctx) return;
+      if (resultHandle) { try { resultHandle.close(); } catch (_) {} resultHandle = null; }
+      closePauseMenu();
+      await ctx.switchTo(SCENES.HUB, { transition: 'fade' });
     }
   
     async function quit() {

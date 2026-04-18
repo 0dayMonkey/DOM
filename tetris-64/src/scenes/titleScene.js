@@ -3,16 +3,18 @@
  *
  * Le titre est notre "cold open" Nintendo 64 : le logo TETRIS 64 flotte
  * lentement dans un ciel violet/orange, quelques cubes Tetris orbitent
- * autour, et un prompt clignote pour inviter à appuyer sur START.
+ * autour, et un prompt clignote pour inviter à appuyer sur ENTRÉE.
  *
- * Sur interact/START, on enchaîne sur la scène HUB (si tu veux la version
- * complète à la Mario 64) ou directement sur le main menu.
+ * Sur interact/START, on enchaîne directement sur la scène HUB (Mario 64
+ * style) : le joueur choisira son mode via les tableaux interactifs du
+ * hub. L'ancien main menu flottant reste disponible dans screens.js pour
+ * un usage futur mais n'est plus utilisé ici.
  *
  * Pour limiter la complexité, titleScene gère elle-même :
  *   - son layout 3D (logo + cubes d'ambiance)
  *   - la caméra (preset TITLE_ORBIT → TITLE_CLOSE)
  *   - son fond (skybox + fog preset 'title')
- *   - ses inputs (INTERACT / START → mainMenu)
+ *   - ses inputs (INTERACT / START → hub)
  *
  * Elle ne gère pas :
  *   - le mute (géré globalement dans main.js)
@@ -38,9 +40,8 @@ export function createTitleScene() {
   let t = 0;
   /** @type {Array<() => void>} */
   let unsubs = [];
-  /** @type {any} */
-  let menuHandle = null;
-  let menuOpen = false;
+  // Garde-fou anti double-trigger pendant la transition vers le hub.
+  let entering = false;
 
   /**
    * @param {import('./sceneManager.js').SceneContext} context
@@ -64,11 +65,11 @@ export function createTitleScene() {
     // Musique
     ctx.audio.playMusic(ctx.audio.MUSIC.TITLE, { fadeInMs: 700 });
 
-    // Inputs : tout press = ouvrir le menu
+    // Inputs : tout press = aller au hub
     unsubs.push(
-      ctx.input.actionMap.on(ACTIONS.INTERACT, (e) => { if (e.phase === 'down') openMenu(); }),
-      ctx.input.actionMap.on(ACTIONS.START, (e) => { if (e.phase === 'down') openMenu(); }),
-      ctx.input.actionMap.on(ACTIONS.HARD_DROP, (e) => { if (e.phase === 'down') openMenu(); }),
+      ctx.input.actionMap.on(ACTIONS.INTERACT, (e) => { if (e.phase === 'down') goToHub(); }),
+      ctx.input.actionMap.on(ACTIONS.START, (e) => { if (e.phase === 'down') goToHub(); }),
+      ctx.input.actionMap.on(ACTIONS.HARD_DROP, (e) => { if (e.phase === 'down') goToHub(); }),
     );
 
     // Caméra intro : zoom arrière doux vers close-up
@@ -139,53 +140,17 @@ export function createTitleScene() {
   }
 
   /**
-   * Ouvre le main menu (mais reste dans la scène title : le menu flotte
-   * au-dessus et on ne change pas de scène tant qu'un choix n'est pas fait).
+   * Transition vers le hub. Remplace l'ancien openMenu() : appuyer sur
+   * Entrée sur l'écran titre emmène directement le joueur dans le hub
+   * Mario 64-style où il choisira un mode via les tableaux. Un drapeau
+   * empêche les double-déclenchements si on martèle Entrée pendant la
+   * transition.
    */
-  function openMenu() {
-    if (!ctx || menuOpen) return;
-    menuOpen = true;
+  async function goToHub() {
+    if (!ctx || entering) return;
+    entering = true;
     ctx.audio.playSfx(ctx.audio.SFX.MENU_SELECT);
-
-    menuHandle = ctx.screens.openMainMenu({ actionMap: ctx.input.actionMap });
-    menuHandle.on('select', (choice) => {
-      const label = String(choice.label || '').toUpperCase();
-      if (label.includes('MARATHON')) {
-        startGame('marathon');
-      } else if (label.includes('SPRINT')) {
-        startGame('sprint40');
-      } else if (label.includes('ZEN')) {
-        startGame('zen');
-      } else if (label.includes('SCORE')) {
-        const sc = ctx.screens.openHighScores({
-          actionMap: ctx.input.actionMap,
-          storage: ctx.storage,
-        });
-        sc.on('back', () => sc.close());
-      } else if (label.includes('RÉGLAGES') || label.includes('REGLAGES')) {
-        const st = ctx.screens.openSettings({
-          actionMap: ctx.input.actionMap,
-          storage: ctx.storage,
-        });
-        st.on('back', () => st.close());
-      }
-    });
-    menuHandle.on('back', () => {
-      menuHandle.close();
-      menuOpen = false;
-    });
-  }
-
-  /**
-   * Lance une partie : transition flash → switch vers game scene avec le mode.
-   * @param {string} mode
-   */
-  async function startGame(mode) {
-    if (!ctx) return;
-    if (menuHandle) { menuHandle.close(); menuHandle = null; }
-    menuOpen = false;
-    ctx.audio.playSfx(ctx.audio.SFX.MENU_SELECT);
-    await ctx.switchTo(SCENES.GAME, { transition: 'iris', params: { mode } });
+    await ctx.switchTo(SCENES.HUB, { transition: 'iris' });
   }
 
   /**
@@ -213,9 +178,7 @@ export function createTitleScene() {
   function destroy() {
     unsubs.forEach((u) => u());
     unsubs = [];
-    if (menuHandle) try { menuHandle.close(); } catch (_) {}
-    menuHandle = null;
-    menuOpen = false;
+    entering = false;
     if (ctx) ctx.input.actionMap.popContext();
     if (root && root.parentNode) root.parentNode.removeChild(root);
     root = null;
