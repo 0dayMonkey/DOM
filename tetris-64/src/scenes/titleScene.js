@@ -19,6 +19,11 @@
  * Elle ne gère pas :
  *   - le mute (géré globalement dans main.js)
  *   - la musique (juste un playMusic au mount)
+ *
+ * TRANSITION VERS LE HUB :
+ *   On utilise la transition signature 'tetris' — une cascade de blocs
+ *   tétrominos qui recouvre l'écran puis disparaît en line clear,
+ *   révélant le hub. Cohérent avec l'ADN du jeu.
  */
 
 import { ACTIONS, SCENES } from '../core/constants.js';
@@ -91,12 +96,11 @@ export function createTitleScene() {
     const logoWrap = el('div', { class: 'title__logo-wrap' });
     const logo = el('h1', { class: 'title__logo' }, 'TETRIS 64');
     const sub = el('div', { class: 'title__subtitle' }, 'UN JEU N64 DE 1996');
-    // Prompt
-    const prompt = el('div', { class: 'title__prompt' }, 'APPUYEZ SUR ENTRÉE');
     logoWrap.appendChild(logo);
     logoWrap.appendChild(sub);
 
-
+    // Prompt
+    const prompt = el('div', { class: 'title__prompt' }, 'APPUYEZ SUR ENTRÉE');
 
     // Conteneur cubes
     const cubesWrap = el('div', { class: 'title__cubes' });
@@ -146,12 +150,15 @@ export function createTitleScene() {
    * Mario 64-style où il choisira un mode via les tableaux. Un drapeau
    * empêche les double-déclenchements si on martèle Entrée pendant la
    * transition.
+   *
+   * On utilise la transition 'tetris' — signature du jeu (cascade de
+   * tétrominos puis line clear).
    */
   async function goToHub() {
     if (!ctx || entering) return;
     entering = true;
     ctx.audio.playSfx(ctx.audio.SFX.MENU_SELECT);
-    await ctx.switchTo(SCENES.HUB, { transition: 'iris' });
+    await ctx.switchTo(SCENES.HUB, { transition: 'tetris' });
   }
 
   /**

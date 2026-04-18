@@ -14,6 +14,10 @@
  *
  * Le sceneManager ne connaît pas le détail des scènes : il leur passe un
  * "context" partagé (camera, audio, fx, input, etc.) et les laisse faire.
+ *
+ * TRANSITIONS SUPPORTÉES : 'fade' | 'iris' | 'flash' | 'tetris'
+ *   (voir scenes/transitions.js pour le détail). 'tetris' est la transition
+ *   signature : cascade de blocs puis line clear.
  */
 
 import { createTitleScene } from './titleScene.js';
@@ -97,7 +101,7 @@ export function createSceneManager(deps) {
    * @param {string} name
    * @param {Object} [options]
    * @param {boolean} [options.immediate=false]
-   * @param {string} [options.transition='fade']  - 'fade' | 'iris' | 'flash'
+   * @param {'fade'|'iris'|'flash'|'tetris'} [options.transition='fade']
    * @param {any} [options.params]
    */
   async function switchTo(name, options = {}) {

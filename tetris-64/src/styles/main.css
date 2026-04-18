@@ -137,7 +137,7 @@
  }
  
  /* ==========================================================================
-    Transitions (fade / iris / star-wipe)
+    Transitions (fade / iris / flash / tetris)
     ========================================================================== */
  
  .transition-overlay {
@@ -148,6 +148,8 @@
    pointer-events: none;
    z-index: var(--z-transition);
    transition: opacity var(--dur-slow) var(--ease-sharp);
+   /* Aucun overflow:hidden — les blocs de la transition Tetris sont
+      contenus dans un grid plein écran, ils ne débordent pas. */
  }
  
  .transition-overlay.is-active {
@@ -173,6 +175,149 @@
  
  .transition-overlay.iris.closing {
    clip-path: circle(0% at 50% 50%);
+ }
+ 
+ /* --------------------------------------------------------------------------
+    Transition TETRIS — signature du jeu
+ 
+    Structure DOM pendant la transition :
+ 
+      .transition-overlay.tetris-transition
+        └─ .tetris-transition__grid       ← CSS grid plein écran
+             └─ .tetris-transition__cell  ← un bloc coloré par cellule
+                                            (→ classes --falling / --clearing
+                                             posées dynamiquement)
+ 
+    Variables CSS par cellule (posées inline depuis JS) :
+      --tt-color           : couleur du tétromino
+      --tt-jitter          : rotation initiale (deg)
+      --tt-col-stagger     : micro-delay horizontal (ms)
+      --tt-fall-duration   : durée de la chute (ms)
+      --tt-fall-delay      : delay avant la chute (ms, stagger par ligne)
+      --tt-clear-duration  : durée du line clear (ms)
+      --tt-clear-delay     : delay avant le line clear (ms)
+    -------------------------------------------------------------------------- */
+ 
+ .tetris-transition {
+   background: transparent;
+ }
+ 
+ .tetris-transition__grid {
+   position: absolute;
+   top: 0;
+   left: 0;
+   display: grid;
+   /* gridTemplateColumns + gridAutoRows sont fixés dynamiquement par JS */
+   pointer-events: none;
+   width: max-content;
+ }
+ 
+ .tetris-transition__cell {
+   position: relative;
+   width: 100%;
+   height: 100%;
+   background:
+     linear-gradient(
+       135deg,
+       color-mix(in srgb, var(--tt-color, #FFF) 100%, white 20%) 0%,
+       var(--tt-color, #FFF) 55%,
+       color-mix(in srgb, var(--tt-color, #FFF) 80%, black 20%) 100%
+     );
+   border: 2px solid var(--outline-dark, #1A1A2E);
+   box-shadow:
+     inset 2px 2px 0 color-mix(in srgb, var(--tt-color, #FFF) 100%, white 35%),
+     inset -2px -2px 0 color-mix(in srgb, var(--tt-color, #FFF) 60%, black 40%);
+   /* État initial : invisible et hors écran haut, attend son animation. */
+   transform: translate3d(0, -120vh, 0) rotate(var(--tt-jitter, 0deg));
+   opacity: 0;
+   will-change: transform, opacity;
+   backface-visibility: hidden;
+ }
+ 
+ /* Fallback si color-mix non supporté : on garde la couleur pleine. */
+ @supports not (background: color-mix(in srgb, red 50%, blue 50%)) {
+   .tetris-transition__cell {
+     background: var(--tt-color, #FFF);
+   }
+ }
+ 
+ /* Phase OUT : chaque bloc tombe du haut vers sa position finale, avec
+    un léger overshoot ("rebond d'atterrissage") puis stabilisation. */
+ .tetris-transition__cell--falling {
+   animation:
+     tt-fall var(--tt-fall-duration, 400ms)
+             cubic-bezier(0.34, 1.56, 0.64, 1)
+             var(--tt-fall-delay, 0ms)
+             both;
+ }
+ 
+ @keyframes tt-fall {
+   0% {
+     transform: translate3d(0, -120vh, 0) rotate(var(--tt-jitter, 0deg));
+     opacity: 0;
+   }
+   20% {
+     opacity: 1;
+   }
+   75% {
+     /* Overshoot sous la position cible pour simuler l'impact. */
+     transform: translate3d(0, 6%, 0) rotate(calc(var(--tt-jitter, 0deg) * 0.3));
+     opacity: 1;
+   }
+   100% {
+     transform: translate3d(0, 0, 0) rotate(0deg);
+     opacity: 1;
+   }
+ }
+ 
+ /* Phase IN : line clear — flash blanc puis shrink vertical + fade. */
+ .tetris-transition__cell--clearing {
+   animation:
+     tt-clear var(--tt-clear-duration, 240ms)
+              cubic-bezier(0.55, 0, 0.45, 1)
+              var(--tt-clear-delay, 0ms)
+              forwards;
+ }
+ 
+ @keyframes tt-clear {
+   0% {
+     transform: translate3d(0, 0, 0) scale(1);
+     filter: brightness(1);
+     opacity: 1;
+   }
+   30% {
+     transform: translate3d(0, 0, 0) scale(1.08, 1);
+     filter: brightness(3.5) saturate(0.3);
+     opacity: 1;
+   }
+   55% {
+     transform: translate3d(0, 0, 0) scale(1.1, 0.6);
+     filter: brightness(2.2);
+     opacity: 0.9;
+   }
+   100% {
+     transform: translate3d(0, 0, 0) scale(0.9, 0);
+     filter: brightness(0.5);
+     opacity: 0;
+   }
+ }
+ 
+ /* Reduced motion : on raccourcit drastiquement pour ne pas infliger
+    une cascade longue aux personnes sensibles. */
+ @media (prefers-reduced-motion: reduce) {
+   .tetris-transition__cell--falling,
+   .tetris-transition__cell--clearing {
+     animation-duration: 120ms !important;
+     animation-delay: 0ms !important;
+   }
+   @keyframes tt-fall {
+     from { opacity: 0; }
+     to   { opacity: 1; transform: translate3d(0, 0, 0); }
+   }
+   @keyframes tt-clear {
+     from { opacity: 1; }
+     to   { opacity: 0; }
+   }
  }
  
  /* ==========================================================================
