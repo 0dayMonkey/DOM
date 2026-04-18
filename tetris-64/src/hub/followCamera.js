@@ -1,20 +1,21 @@
 /**
  * followCamera.js — Caméra "tierce personne" qui suit le joueur dans le hub.
  *
- * Comportement :
- *   - La caméra se place derrière le joueur (axe Z positif, décalage Y en hauteur).
- *   - Elle interpole sa position vers une cible désirée à chaque frame (lerp).
- *   - Elle regarde légèrement vers l'avant du joueur (lookAhead) pour donner
- *     un sentiment de mouvement et anticiper la trajectoire.
+ * LERPS SÉPARÉS (fix clé)
+ *   Le player peut pivoter très vite (appuyer sur ArrowRight alors qu'on
+ *   marchait vers le fond = ~90° de rotation quasi-instantanée côté input).
+ *   Si on utilise le même facteur d'interpolation pour la position ET la
+ *   rotation, on voit la caméra "glisser" sur le côté pendant que sa
+ *   rotation rattrape. Pour éviter ça :
+ *     - lerpPos   : lissage de la position (bas = plus fluide)
+ *     - lerpRot   : lissage de l'angle (haut = caméra toujours dans le dos)
+ *   Par défaut lerpRot = 0.35, très agressif, pour que la caméra colle à
+ *   l'orientation du joueur.
  *
- * Ce module écrit directement via `camera.setOffset()` — il ne touche pas
- * à la "transform" principale de la caméra, ce qui permet à d'autres
- * systèmes (transitions, presets) de préempter la caméra sans se battre.
- * Le followCamera ne fait QUE écrire un offset additionnel.
- *
- * On peut l'activer/désactiver à la volée (enable/disable) : utile pour
- * les cinématiques d'intro où la caméra suit une séquence fixe avant de
- * reprendre le joueur.
+ * CONVENTIONS (vérifiées par test unitaire)
+ *   forward_player(a) = (sin a, 0, cos a)
+ *   ry_deg = 180 - angle_deg
+ *   pos_cam = pos_player − forward_player × distance
  */
 
 import { lerp, lerpAngle } from '../utils/math3d.js';
@@ -24,9 +25,9 @@ import { lerp, lerpAngle } from '../utils/math3d.js';
  * @property {ReturnType<import('../camera/camera.js').createCamera>} camera
  * @property {{getPosition: () => {x:number,y:number,z:number}, getAngle?: () => number}} target
  * @property {{x:number, y:number, z:number}} [offset]
- * @property {number} [lerp=0.08]
- * @property {number} [lookAheadFactor=0.3]
- * @property {number} [tiltDeg=-12]
+ * @property {number} [lerpPos=0.18]
+ * @property {number} [lerpRot=0.35]
+ * @property {number} [tiltDeg=-14]
  */
 
 /**
@@ -37,33 +38,18 @@ export function createFollowCamera(options) {
   const target = options.target;
   const offset = {
     x: options.offset?.x ?? 0,
-    y: options.offset?.y ?? -120,
-    z: options.offset?.z ?? 360,
+    y: options.offset?.y ?? -240,
+    z: options.offset?.z ?? 480,
   };
-  const smoothing = options.lerp ?? 0.08;
-  const lookAhead = options.lookAheadFactor ?? 0.3;
-  const tiltDeg = options.tiltDeg ?? -12;
+  let lerpPos = options.lerpPos ?? 0.18;
+  let lerpRot = options.lerpRot ?? 0.35;
+  let tiltDeg = options.tiltDeg ?? -14;
 
-  /** Position filtrée (interpolée) de la caméra en coordonnées hub. */
-  let curX = 0;
-  let curY = offset.y;
-  let curZ = offset.z;
-  let curRy = 0;
-
-  /** Position cible calculée chaque frame. */
-  let tgtX = 0;
-  let tgtY = offset.y;
-  let tgtZ = offset.z;
-  let tgtRy = 0;
-
+  let curX = 0, curY = offset.y, curZ = offset.z, curRy = 0;
+  let tgtX = 0, tgtY = offset.y, tgtZ = offset.z, tgtRy = 0;
   let enabled = false;
 
-  // Initialisation immédiate : snap à la cible sans lerp
   snapToTarget();
-
-  // ---------------------------------------------------------------------
-  // API
-  // ---------------------------------------------------------------------
 
   function enable() {
     enabled = true;
@@ -73,21 +59,18 @@ export function createFollowCamera(options) {
 
   function disable() {
     enabled = false;
-    // On remet l'offset caméra à zéro pour ne pas laisser de résidu.
-    camera.setOffset({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 });
   }
 
   /**
-   * @param {number} dtMs
+   * @param {number} _dtMs
    */
   function update(_dtMs) {
     if (!enabled) return;
     computeTarget();
-    // Interpolation cadrée au framerate (on multiplie par un gain constant).
-    curX = lerp(curX, tgtX, smoothing);
-    curY = lerp(curY, tgtY, smoothing);
-    curZ = lerp(curZ, tgtZ, smoothing);
-    curRy = lerpAngle(curRy, tgtRy, smoothing);
+    curX = lerp(curX, tgtX, lerpPos);
+    curY = lerp(curY, tgtY, lerpPos);
+    curZ = lerp(curZ, tgtZ, lerpPos);
+    curRy = lerpAngle(curRy, tgtRy, lerpRot);
     apply();
   }
 
@@ -100,27 +83,17 @@ export function createFollowCamera(options) {
     const p = target.getPosition();
     const angle = target.getAngle ? target.getAngle() : 0;
 
-    // Vecteur "derrière le joueur" : le joueur regarde dans la direction angle,
-    // on recule sur ce même axe de `offset.z` pour se placer derrière lui.
-    // atan2(dx, dz) ↦ l'axe "forward" du joueur est (sin(a), _, cos(a)).
-    const backDist = offset.z;
     const fwdX = Math.sin(angle);
     const fwdZ = Math.cos(angle);
 
-    tgtX = p.x - fwdX * backDist;
-    tgtZ = p.z - fwdZ * backDist;
+    tgtX = p.x - fwdX * offset.z;
+    tgtZ = p.z - fwdZ * offset.z;
     tgtY = p.y + offset.y;
-
-    // Rotation Y de la caméra : elle "pointe" vers le joueur (donc sa rotation
-    // est l'opposée de l'angle de recul).
-    // Convention CSS : rotateY positif tourne dans le sens horaire autour de Y.
-    tgtRy = (angle * 180) / Math.PI;
+    tgtRy = 180 - (angle * 180) / Math.PI;
   }
 
   function apply() {
-    // On applique la position comme un OFFSET de caméra. La caméra courante
-    // reste maîtresse de son "preset" (ex: HUB_FOLLOW) ; cet offset s'y ajoute.
-    camera.setOffset({
+    camera.set({
       x: curX,
       y: curY,
       z: curZ,
@@ -130,8 +103,11 @@ export function createFollowCamera(options) {
     });
   }
 
+  // ---------------------------------------------------------------------
+  // TWEAKING — API exposée pour ajuster en live depuis la console
+  // ---------------------------------------------------------------------
+
   /**
-   * Modifie l'offset "derrière le joueur" à chaud.
    * @param {{x?:number, y?:number, z?:number}} newOffset
    */
   function setOffset(newOffset) {
@@ -140,15 +116,36 @@ export function createFollowCamera(options) {
     if (typeof newOffset.z === 'number') offset.z = newOffset.z;
   }
 
-  function destroy() {
-    disable();
+  function getOffset() { return { ...offset }; }
+
+  /**
+   * Inclinaison verticale. Négatif = regard vers le bas.
+   * @param {number} deg
+   */
+  function setTilt(deg) { tiltDeg = deg; }
+  function getTilt() { return tiltDeg; }
+
+  /**
+   * @param {{pos?:number, rot?:number}} cfg
+   */
+  function setLerp(cfg) {
+    if (typeof cfg.pos === 'number') lerpPos = cfg.pos;
+    if (typeof cfg.rot === 'number') lerpRot = cfg.rot;
   }
+  function getLerp() { return { pos: lerpPos, rot: lerpRot }; }
+
+  function destroy() { disable(); }
 
   return Object.freeze({
     enable,
     disable,
     update,
     setOffset,
+    getOffset,
+    setTilt,
+    getTilt,
+    setLerp,
+    getLerp,
     snapToTarget,
     destroy,
     isEnabled: () => enabled,

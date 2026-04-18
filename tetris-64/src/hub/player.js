@@ -1,20 +1,29 @@
 /**
  * player.js — Personnage contrôlable dans le hub.
  *
- * Un petit "mascotte-cube" composé de plusieurs éléments DOM :
- *   - un corps (cube principal)
- *   - une tête (cube plus petit au-dessus, avec yeux)
+ * Un petit "mascotte-cube" composé de :
+ *   - un corps (cube principal rouge)
+ *   - une tête (cube crème avec yeux)
  *   - une ombre plate au sol
  *
- * Contrôles :
- *   ← / → (hub) : tourner et avancer sur l'axe X
- *   ↑ / ↓ (hub) : avancer / reculer sur l'axe Z
+ * CONTRÔLES
+ *   ← / → : se déplacer gauche / droite (X)
+ *   ↑ / ↓ : avancer / reculer (Z)
  *
- * Le personnage a une vitesse, une direction (angle en radians), et une
- * physique minimale (pas de saut, pas de gravité — il est toujours au sol).
+ * IMPORTANT : dans le keymap par défaut (pensé pour le jeu Tetris), les
+ * flèches ↑ et ↓ sont mappées à ACTIONS.ROTATE_CW et ACTIONS.SOFT_DROP.
+ * Dans le hub, on veut qu'elles servent à MOVE_UP/MOVE_DOWN. Deux choix :
+ *   1) Re-binder le keymap spécifiquement en contexte hub
+ *   2) Écouter aussi ROTATE_CW et SOFT_DROP côté player du hub
+ * On choisit (2) pour rester non-invasif sur le keymap global.
  *
- * Il émet une particule de poussière à intervalles réguliers quand il marche,
- * et joue le SFX footstep à chaque pas complet.
+ * Convention d'angle :
+ *   - angle = 0 (pas de rotation) → le player "regarde" vers +Z
+ *   - rotateY(180°) → regarde vers -Z (fond de la salle, mur arrière)
+ *   - forward_player(a) = (sin a, 0, cos a)
+ *
+ * Le player spawn donc avec angle = π pour regarder vers le mur arrière
+ * (où sont accrochés les tableaux) dès l'arrivée dans le hub.
  */
 
 import { ACTIONS } from '../core/constants.js';
@@ -49,10 +58,11 @@ export function createHubPlayer(options) {
   let y = options.spawn?.y ?? 0;
   let z = options.spawn?.z ?? 400;
 
-  /** Orientation en radians (0 = regarde vers -Z, le fond). */
-  let angle = Math.PI; // regarde vers +Z par défaut (vers la caméra)
+  /** Orientation en radians.
+   *  angle = π → rotateY(180) → regarde vers -Z (fond de la salle). */
+  let angle = Math.PI;
 
-  /** Animation de pas : cumul distance parcourue. */
+  /** Animations de pas. */
   let walkAccum = 0;
   let bobPhase = 0;
 
@@ -69,7 +79,6 @@ export function createHubPlayer(options) {
   const shadow = el('div', { class: 'hub-player__shadow' });
   const bodyWrap = el('div', { class: 'hub-player__body-wrap' });
   const body = el('div', { class: 'hub-player__body' });
-  // 6 faces du corps pour un vrai cube
   ['front', 'back', 'left', 'right', 'top', 'bottom'].forEach((f) => {
     body.appendChild(el('div', { class: `hub-player__face hub-player__face--${f}` }));
   });
@@ -95,16 +104,29 @@ export function createHubPlayer(options) {
   // INPUTS
   // ---------------------------------------------------------------------
 
+  /**
+   * Bind une action abstraite à une direction d'input.
+   * @param {string} action
+   * @param {'up'|'down'|'left'|'right'} key
+   */
   function bindInputAction(action, key) {
     unsubs.push(actionMap.on(action, (e) => {
       if (e.phase === 'up') input[key] = 0;
       else input[key] = 1;
     }));
   }
-  bindInputAction(ACTIONS.MOVE_UP, 'up');
-  bindInputAction(ACTIONS.MOVE_DOWN, 'down');
-  bindInputAction(ACTIONS.MOVE_LEFT, 'left');
+
+  // Bindings explicites (WASD-style si re-mappé)
+  bindInputAction(ACTIONS.MOVE_UP,    'up');
+  bindInputAction(ACTIONS.MOVE_DOWN,  'down');
+  bindInputAction(ACTIONS.MOVE_LEFT,  'left');
   bindInputAction(ACTIONS.MOVE_RIGHT, 'right');
+
+  // Fallback pour les flèches ↑/↓ qui, dans le keymap par défaut, sont
+  // mappées à ROTATE_CW et SOFT_DROP (pour le jeu Tetris). Dans le hub,
+  // on les interprète comme MOVE_UP / MOVE_DOWN.
+  bindInputAction(ACTIONS.ROTATE_CW, 'up');
+  bindInputAction(ACTIONS.SOFT_DROP, 'down');
 
   // ---------------------------------------------------------------------
   // UPDATE
@@ -116,21 +138,34 @@ export function createHubPlayer(options) {
   function update(dtMs) {
     const dt = dtMs / 1000;
 
-    // Input direction : tank controls relaxés (orient = direction de marche)
+    // Direction désirée dans le plan XZ
+    //   dx > 0 = vers +X (droite)
+    //   dz > 0 = vers +Z (avant de la salle)
+    //   dz < 0 = vers -Z (fond / mur des tableaux)
     const dx = input.right - input.left;
-    const dz = input.down - input.up;
+    const dz = input.down - input.up;  // ArrowDown → +Z, ArrowUp → -Z
     const moving = dx !== 0 || dz !== 0;
 
     if (moving) {
-      const targetAngle = Math.atan2(dx, dz); // orient vers le vecteur désiré
+      // Calcule l'angle désiré. La convention est :
+      //   angle = 0    → forward (sin 0, 0, cos 0) = (0, 0, 1) = +Z (vers avant)
+      //   angle = π    → forward (0, 0, -1) = -Z (vers fond)
+      //   angle = +π/2 → forward (+1, 0, 0) = +X
+      //   angle = -π/2 → forward (-1, 0, 0) = -X
+      //
+      // Pour un vecteur désiré (dx, dz), l'angle qui donne forward = (dx, dz)
+      // normalisé, on veut sin(angle) = dx/|d| et cos(angle) = dz/|d|.
+      // Donc angle = atan2(dx, dz).
+      const targetAngle = Math.atan2(dx, dz);
       angle = lerpAngle(angle, targetAngle, Math.min(1, turnSpeed * dt));
+
       const len = Math.hypot(dx, dz) || 1;
       const nx = dx / len;
       const nz = dz / len;
       x += nx * speed * dt;
       z += nz * speed * dt;
 
-      // Clamp aux bornes
+      // Clamp aux bornes de la salle
       if (bounds) {
         if (x < bounds.minX) x = bounds.minX;
         if (x > bounds.maxX) x = bounds.maxX;
@@ -142,8 +177,10 @@ export function createHubPlayer(options) {
       bobPhase += dt * 10;
       if (walkAccum > 180) {
         walkAccum = 0;
-        audio.playSfx(audio.SFX.HUB_FOOTSTEP, { volume: 0.5, rate: 0.9 + Math.random() * 0.2 });
-        // Petite poussière sous les pieds
+        audio.playSfx(audio.SFX.HUB_FOOTSTEP, {
+          volume: 0.5,
+          rate: 0.9 + Math.random() * 0.2,
+        });
         particles.dust(x, -30, { count: 3 });
       }
     } else {
@@ -157,7 +194,9 @@ export function createHubPlayer(options) {
   function applyTransform() {
     const bob = Math.sin(bobPhase) * 4;
     const deg = (angle * 180) / Math.PI;
+    // Position : (x, y, z) dans le monde hub
     root.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
+    // Orientation : rotateY(angle_en_deg) + bob vertical
     bodyWrap.style.transform = `translate3d(0px, ${bob}px, 0px) rotateY(${deg}deg)`;
   }
 
@@ -170,7 +209,7 @@ export function createHubPlayer(options) {
   }
 
   /**
-   * @returns {number} angle radians
+   * @returns {number} angle en radians
    */
   function getAngle() {
     return angle;

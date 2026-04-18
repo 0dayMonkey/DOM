@@ -11,6 +11,13 @@
  *
  * Ce fichier reste "mince" : il compose des modules auto-suffisants. Toute
  * logique métier doit rester dans son module respectif.
+ *
+ * ORDRE DE MISE À JOUR — CRITIQUE :
+ *   Le followCamera (utilisé dans hubScene) écrit sa position via
+ *   camera.setOffset(). effects.update() fait AUSSI un setOffset() avec
+ *   tilt+punch. Pour que followCamera ait le dernier mot et compose ses
+ *   valeurs avec tilt+punch, on met à jour effects AVANT la scène courante.
+ *   Ainsi followCamera peut lire l'offset d'effects et l'intégrer.
  */
 
 import { createCamera } from './camera/camera.js';
@@ -31,6 +38,7 @@ import {
   MAX_FRAME_DT_MS,
   SCENES,
   DEFAULT_KEYMAP,
+  ACTIONS,
 } from './core/constants.js';
 import { $, prefersReducedMotion, isTouchDevice } from './utils/helpers.js';
 
@@ -44,7 +52,6 @@ const sceneRoot = $('#scene-root');
 const skyboxEl = $('#skybox');
 const fogEl = $('#fog');
 const fxLayer = $('#fx-layer');
-const uiOverlay = $('#ui-overlay');
 const hudEl = $('#hud');
 const screensEl = $('#screens');
 const textPopLayer = $('#text-pop-layer');
@@ -166,16 +173,17 @@ function loop(now) {
 
   // Ordre de mise à jour :
   // 1) Inputs (poll DAS/ARR)
-  // 2) Scène active (logique game)
-  // 3) Effets caméra (tilt, punch)
-  // 4) Caméra (interpolations, shake)
+  // 2) Effets caméra (tilt, punch) — écrit d'abord un offset de base
+  // 3) Scène active (logique game, follow camera) — peut lire et composer
+  //    avec l'offset d'effects pour avoir le dernier mot
+  // 4) Caméra (interpolations, shake, applique les transformations CSS)
   // 5) Skybox (sync rotation)
   // 6) Fog (pulse, fade)
-  // 7) Particules + text pops
+  // 7) Particules
   keyboard.update(dt);
   if (touch) touch.update(dt);
-  sceneManager.update(dt);
-  effects.update(dt);
+  effects.update(dt);            // ← AVANT scene : pose l'offset de base
+  sceneManager.update(dt);       // ← scène (+ followCamera) a le dernier mot
   camera.update(dt);
   skybox.syncToCamera(camera.getTransform());
   fog.update(dt);
@@ -204,8 +212,10 @@ if (muteBtn) {
   refreshMuteBtn();
 }
 
-// Raccourci M global
-actionMap.on('mute', () => {
+// Raccourci M global — utilise la constante ACTIONS.MUTE
+actionMap.on(ACTIONS.MUTE, (e) => {
+  // On ne réagit qu'au "down" pour éviter le toggle en boucle sur repeat/up
+  if (e.phase !== 'down') return;
   audio.setMuted();
   refreshMuteBtn();
 });

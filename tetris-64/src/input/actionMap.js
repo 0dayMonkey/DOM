@@ -53,7 +53,6 @@ export function createActionMap(options = {}) {
   // -----------------------------------------------------------------------
 
   /**
-   * Retourne l'action associée à un code de touche, ou null.
    * @param {string} code
    * @returns {string | null}
    */
@@ -62,7 +61,6 @@ export function createActionMap(options = {}) {
   }
 
   /**
-   * Remplace complètement le keymap.
    * @param {Record<string, string>} newMap
    */
   function setKeymap(newMap) {
@@ -70,7 +68,6 @@ export function createActionMap(options = {}) {
   }
 
   /**
-   * Ajoute un binding individuel.
    * @param {string} code
    * @param {string} action
    */
@@ -79,7 +76,6 @@ export function createActionMap(options = {}) {
   }
 
   /**
-   * Retire un binding.
    * @param {string} code
    */
   function unbind(code) {
@@ -95,7 +91,6 @@ export function createActionMap(options = {}) {
   // -----------------------------------------------------------------------
 
   /**
-   * S'abonne à une action. Retourne une fonction d'unsub.
    * @param {string} action
    * @param {(e: ActionEvent) => void} handler
    * @returns {() => void}
@@ -111,7 +106,6 @@ export function createActionMap(options = {}) {
   }
 
   /**
-   * Retire un listener.
    * @param {string} action
    * @param {(e: ActionEvent) => void} handler
    */
@@ -121,9 +115,6 @@ export function createActionMap(options = {}) {
   }
 
   /**
-   * Déclenche une action (appelé par keyboard.js, touch.js, etc.).
-   * Filtre par contexte courant.
-   *
    * @param {string} action
    * @param {InputPhase} [phase='down']
    * @param {any} [source]
@@ -143,7 +134,6 @@ export function createActionMap(options = {}) {
   // -----------------------------------------------------------------------
 
   /**
-   * Définit les actions autorisées pour un contexte donné.
    * @param {string} name
    * @param {string[]} actions
    */
@@ -152,7 +142,6 @@ export function createActionMap(options = {}) {
   }
 
   /**
-   * Empile un contexte (devient actif).
    * @param {string} name
    */
   function pushContext(name) {
@@ -160,7 +149,6 @@ export function createActionMap(options = {}) {
   }
 
   /**
-   * Dépile le contexte (retour au précédent).
    * @returns {string | null}
    */
   function popContext() {
@@ -169,7 +157,6 @@ export function createActionMap(options = {}) {
   }
 
   /**
-   * Remplace le haut de pile.
    * @param {string} name
    */
   function replaceContext(name) {
@@ -187,23 +174,34 @@ export function createActionMap(options = {}) {
   function isActionAllowedInCurrentContext(action) {
     const ctx = getContext();
     const allowed = contextActions.get(ctx);
-    if (!allowed) return true; // contexte non défini → on autorise tout
+    if (!allowed) return true;
     return allowed.has(action);
   }
 
   // -----------------------------------------------------------------------
   // DÉFINITIONS PAR DÉFAUT DES CONTEXTES
   // -----------------------------------------------------------------------
+  // Règle : on autorise dans chaque contexte les actions qui ont un sens
+  // pour ce contexte.
 
   defineContext('title', [
     ACTIONS.INTERACT, ACTIONS.START, ACTIONS.BACK,
     ACTIONS.MOVE_UP, ACTIONS.MOVE_DOWN, ACTIONS.MOVE_LEFT, ACTIONS.MOVE_RIGHT,
+    ACTIONS.HARD_DROP,
     ACTIONS.MUTE, ACTIONS.PAUSE,
   ]);
 
+  // Hub : les flèches ↑/↓ du keymap par défaut sont mappées sur ROTATE_CW
+  // et SOFT_DROP (pour Tetris). On les autorise donc dans le contexte hub
+  // pour qu'elles atteignent player.js qui les interprète comme MOVE_UP /
+  // MOVE_DOWN.
   defineContext('hub', [
     ACTIONS.MOVE_LEFT, ACTIONS.MOVE_RIGHT, ACTIONS.MOVE_UP, ACTIONS.MOVE_DOWN,
     ACTIONS.INTERACT, ACTIONS.BACK, ACTIONS.START, ACTIONS.PAUSE, ACTIONS.MUTE,
+    ACTIONS.HARD_DROP,
+    // Fallback flèches Haut/Bas : elles arrivent comme ROTATE_CW/SOFT_DROP
+    // dans le keymap par défaut. player.js les écoute aussi.
+    ACTIONS.ROTATE_CW, ACTIONS.SOFT_DROP,
   ]);
 
   defineContext('game', [
@@ -216,25 +214,20 @@ export function createActionMap(options = {}) {
   defineContext('menu', [
     ACTIONS.MOVE_UP, ACTIONS.MOVE_DOWN, ACTIONS.MOVE_LEFT, ACTIONS.MOVE_RIGHT,
     ACTIONS.INTERACT, ACTIONS.BACK, ACTIONS.PAUSE, ACTIONS.MUTE,
+    ACTIONS.START,
   ]);
 
   // -----------------------------------------------------------------------
   // DIVERS
   // -----------------------------------------------------------------------
 
-  /**
-   * Retire tous les listeners (utilisé au teardown d'une scène).
-   */
   function clearListeners() {
     listeners.clear();
   }
 
   return Object.freeze({
-    // keymap
     resolveKey, setKeymap, bind, unbind, getKeymap,
-    // listeners
     on, off, trigger, clearListeners,
-    // contexts
     defineContext, pushContext, popContext, replaceContext, getContext,
   });
 }

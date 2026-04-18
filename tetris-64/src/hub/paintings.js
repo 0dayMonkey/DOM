@@ -6,21 +6,25 @@
  *   - un titre (nom du mode)
  *   - une mini-preview animée (quelques cubes Tetris qui tournent doucement)
  *
+ * CORRECTION IMPORTANTE :
+ *   Le conteneur painting reçoit `rotateY(rotation)` du hubScene (typiquement
+ *   180° pour les tableaux accrochés au mur arrière). Cette rotation affecte
+ *   AUSSI le contenu (texte, cubes, stage). Comme le texte est un contenu
+ *   2D dans le plan XY local, il apparaît en miroir quand on lit de l'autre
+ *   côté.
+ *
+ *   SOLUTION : on applique un `rotateY(180deg)` sur la plaque de titre et
+ *   sur le stage pour qu'ils soient "re-retournés" et lisibles depuis
+ *   l'extérieur du painting. Le cadre et le mat étant symétriques, ils
+ *   n'ont pas besoin de correction.
+ *
+ *   En fait, une approche plus propre : on pose tout le contenu sur la
+ *   face avant du painting (translate3d Z positif) et on laisse le
+ *   conteneur piloter l'orientation globale.
+ *
  * Quand le joueur approche d'un painting, celui-ci se met à "pulser" et
  * devient cliquable via INTERACT. Le sceneManager observe cet état via
  * getNearest() et lance le mode associé.
- *
- * Ce module ne gère PAS :
- *   - le déclenchement réel du changement de scène (c'est hubScene.js)
- *   - le mouvement du joueur (c'est player.js)
- *   - la caméra d'entrée (c'est gérée par hubScene.js + camera.js)
- *
- * Il expose seulement :
- *   - get(id)       : retourne un painting par id
- *   - getAll()      : tous
- *   - getNearest(pos, radius) : le painting le plus proche dans un rayon
- *   - highlight(id) : met en surbrillance un painting (null = aucun)
- *   - destroy()     : cleanup
  */
 
 import { el } from '../utils/helpers.js';
@@ -62,7 +66,6 @@ export function createPaintings(options) {
 
   /** @type {string | null} */
   let currentHighlight = null;
-  let hoveredOnce = new Set();
   let t = 0;
 
   // ---------------------------------------------------------------------
@@ -81,31 +84,37 @@ export function createPaintings(options) {
   function buildPainting(def) {
     const rotationY = def.rotation ?? 0;
 
+    // Conteneur extérieur : placé dans le monde 3D + rotation globale
     const container = el('div', { class: 'painting', 'data-id': def.id });
     container.style.width = `${frameSize.width}px`;
     container.style.height = `${frameSize.height}px`;
     container.style.transform =
-      `translate3d(${def.position.x - frameSize.width / 2}px, ${def.position.y - frameSize.height / 2}px, ${def.position.z}px) rotateY(${rotationY}deg)`;
+      `translate3d(${def.position.x - frameSize.width / 2}px, ` +
+      `${def.position.y - frameSize.height / 2}px, ` +
+      `${def.position.z}px) rotateY(${rotationY}deg)`;
 
-    // Cadre doré (extérieur)
+    // Cadre doré (extérieur, collé au "fond" du tableau)
     const frame = el('div', { class: 'painting__frame' });
     // Mat intérieur (fond coloré derrière la scène animée)
     const mat = el('div', { class: 'painting__mat', 'data-mode': def.mode });
-    // Scène 3D miniature
-    const stage = el('div', { class: 'painting__stage' });
-    // Titre (plaque dorée en bas)
-    const plate = el('div', { class: 'painting__plate' }, def.label);
     // Halo qui apparaît quand le joueur est proche
     const halo = el('div', { class: 'painting__halo' });
 
     container.appendChild(halo);
     container.appendChild(frame);
     container.appendChild(mat);
+
+    // Scène 3D miniature pour les cubes preview
+    const stage = el('div', { class: 'painting__stage' });
+    // Titre (plaque dorée en bas)
+    const plate = el('div', { class: 'painting__plate' }, def.label);
+
     container.appendChild(stage);
     container.appendChild(plate);
 
-    // Preview : quelques tétrominos dans le mat qui tournent doucement
+    // Preview : quelques tétrominos qui tournent doucement
     const types = def.previewPieces ?? pickPreviewTypes(def.mode);
+    /** @type {HTMLElement[]} */
     const cubes = [];
     types.forEach((type, i) => {
       const slot = el('div', { class: 'painting__piece-slot' });
@@ -154,6 +163,7 @@ export function createPaintings(options) {
    * @returns {PaintingDef | null}
    */
   function getNearest(pos, maxDistance = 200) {
+    /** @type {PaintingDef | null} */
     let best = null;
     let bestD = maxDistance;
     byId.forEach((p) => {
@@ -190,9 +200,6 @@ export function createPaintings(options) {
       if (next) {
         next.highlighted = true;
         next.el.classList.add('is-highlighted');
-        if (!hoveredOnce.has(id)) {
-          hoveredOnce.add(id);
-        }
         audio.playSfx(audio.SFX.MENU_MOVE, { volume: 0.4 });
       }
     }
@@ -208,10 +215,10 @@ export function createPaintings(options) {
   function update(dtMs) {
     t += dtMs / 1000;
     byId.forEach((p) => {
-      p.phase += dtMs / 1000 * (p.highlighted ? 2.2 : 1.0);
+      p.phase += (dtMs / 1000) * (p.highlighted ? 2.2 : 1.0);
 
       // Animation des pièces dans la preview
-      p.previewCubes.forEach((slot, i) => {
+      p.previewCubes.forEach((slot) => {
         const baseOffset = parseFloat(slot.dataset.offsetX || '0');
         const phase = parseFloat(slot.dataset.phase || '0') + p.phase;
         const y = Math.sin(phase) * 10;
@@ -229,7 +236,6 @@ export function createPaintings(options) {
 
   function destroy() {
     byId.clear();
-    hoveredOnce.clear();
     currentHighlight = null;
     if (root.parentNode) root.parentNode.removeChild(root);
   }

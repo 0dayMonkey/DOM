@@ -17,6 +17,13 @@
  *
  * Ce module est principalement stateful, mais ne dépend pas d'un framework :
  * il agit sur un HTMLElement fourni à la création.
+ *
+ * NOTE IMPORTANTE SUR LES PRESETS :
+ *   On utilise `getPreset()` de `../camera/presets.js` qui combine
+ *   les presets de base (constants.js → CAMERA_PRESETS) avec les presets
+ *   étendus (TITLE_WIDE, TITLE_CLOSE, HUB_INTRO, etc.). Auparavant on ne
+ *   consultait que CAMERA_PRESETS et les noms comme HUB_INTRO renvoyaient
+ *   identity, ce qui positionnait la caméra à (0,0,0) = dans le sol.
  */
 
 import {
@@ -27,7 +34,7 @@ import {
     toInverseCameraTransform,
     saturate,
   } from '../utils/math3d.js';
-  import { CAMERA_PRESETS } from '../core/constants.js';
+  import { getPreset } from './presets.js';
   
   /**
    * @typedef {import('../utils/math3d.js').Transform3D} Transform3D
@@ -196,17 +203,16 @@ import {
   
     /**
      * Résout un nom de preset ou une Transform3D directe.
+     * Utilise getPreset() de presets.js qui connaît TOUS les presets
+     * (base + extras comme HUB_INTRO, TITLE_WIDE, GAME_CLEAR_EMPHASIS...).
+     *
      * @param {string | Transform3D} target
      * @returns {Transform3D}
      */
     function resolveTarget(target) {
       if (typeof target === 'string') {
-        const preset = /** @type {Record<string, Transform3D>} */ (CAMERA_PRESETS)[target];
-        if (!preset) {
-          console.warn(`[camera] preset inconnu : ${target}`);
-          return { ...current };
-        }
-        return { ...identityTransform(), ...preset };
+        // getPreset gère lui-même les warnings et le fallback sur identity
+        return getPreset(target);
       }
       return { ...identityTransform(), ...target };
     }
