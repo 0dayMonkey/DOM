@@ -91,11 +91,12 @@ export function createTitleScene() {
     const logoWrap = el('div', { class: 'title__logo-wrap' });
     const logo = el('h1', { class: 'title__logo' }, 'TETRIS 64');
     const sub = el('div', { class: 'title__subtitle' }, 'UN JEU N64 DE 1996');
+    // Prompt
+    const prompt = el('div', { class: 'title__prompt' }, 'APPUYEZ SUR ENTRÉE');
     logoWrap.appendChild(logo);
     logoWrap.appendChild(sub);
 
-    // Prompt
-    const prompt = el('div', { class: 'title__prompt' }, 'APPUYEZ SUR ENTRÉE');
+
 
     // Conteneur cubes
     const cubesWrap = el('div', { class: 'title__cubes' });

@@ -87,24 +87,25 @@
      PROMPT — "APPUYEZ SUR ENTRÉE"
      ========================================================================== */
   
-  .title__prompt {
-    position: absolute;
-    top: 75%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-family: 'Press Start 2P', monospace;
-    font-size: clamp(12px, 2vw, 18px);
-    letter-spacing: 3px;
-    color: var(--ui-text-light, #FFF8E0);
-    text-shadow: var(--shadow-text);
-    padding: 10px 24px;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--dur-slow) var(--ease-out);
-  }
-  
+     .title__prompt {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, 200px);   /* centré horizontalement, 200px sous le centre */
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(12px, 2vw, 18px);
+      letter-spacing: 3px;
+      color: var(--ui-text-light, #FFF8E0);
+      text-shadow: var(--shadow-text);
+      text-align: center;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--dur-slow) var(--ease-out);
+    }
   .title__prompt.is-visible {
     opacity: 1;
+    
     animation: title-prompt-blink 1.2s steps(2, end) infinite;
   }
   
@@ -118,7 +119,7 @@
   
   .title__credits {
     position: absolute;
-    bottom: 16px;
+    bottom: 220px;
     left: 50%;
     transform: translateX(-50%);
     font-family: 'Press Start 2P', monospace;
@@ -126,6 +127,8 @@
     letter-spacing: 2px;
     color: rgba(255, 248, 224, 0.55);
     pointer-events: none;
+    white-space: nowrap;
+
   }
   
   /* ==========================================================================
@@ -166,8 +169,9 @@
       letter-spacing: 2px;
     }
     .title__prompt {
-      top: 78%;
+      top: 86%;
       font-size: 12px;
+      
     }
   }
   
