@@ -1,50 +1,35 @@
 /**
- * followCamera.js — Caméra "tierce personne" GTA V–like.
+ * followCamera.js — Caméra "tierce personne" avec collision murs raycast.
  *
  * ========================================================================
- *  FEATURES (inspirées de GTA V)
+ *  COLLISION MURS — GARANTIE ANTI-TRAVERSEE
  * ========================================================================
  *
- *  1. AUTO-CENTER LENT DE LA ROTATION
- *     La caméra ne suit PAS instantanément la rotation du joueur. Son
- *     angle dérive très lentement vers "derrière le joueur" (lerpRot très
- *     faible, ~0.04). Quand le perso tourne, on le voit pivoter devant la
- *     caméra avant qu'elle ne rattrape. C'est la signature GTA.
+ *  La caméra effectue un RAYCAST depuis le joueur vers sa position idéale
+ *  contre tous les segments de murs fournis via `walls`. Si le rayon
+ *  intersecte un mur, la caméra est plaquée juste devant ce mur, côté
+ *  joueur, avec une marge de `wallPadding` pixels.
  *
- *  2. REGARD DEVANT LE PERSO (look-ahead)
- *     La caméra ne regarde pas le perso directement, mais un point à X
- *     unités DEVANT lui dans sa direction de marche. Résultat : le perso
- *     apparaît en bas d'écran, l'horizon prend plus de place. Règle des
- *     tiers respectée.
+ *  Conséquence : la caméra ne peut PHYSIQUEMENT jamais se retrouver de
+ *  l'autre côté d'un mur, quel que soit l'état précédent ou le mouvement
+ *  du joueur. C'est une garantie géométrique, pas un lerp qui peut rater.
  *
- *  3. DEADZONE DE POSITION
- *     Quand la caméra est à moins de `deadzoneRadius` pixels de sa
- *     position idéale, elle NE BOUGE PAS. Elle n'absorbe que les grands
- *     déplacements. Les micro-mouvements sont ignorés → caméra calme.
- *
- *  4. SPEED-BASED DISTANCE + HAUTEUR
- *     Plus le joueur court vite, plus la caméra s'éloigne (simule l'effet
- *     FOV qui s'élargit en accéléré). Elle se baisse aussi un peu pour
- *     montrer plus d'horizon. Quand le joueur s'arrête, elle se rapproche.
- *
- *  5. CAMERA COLLISION (clamp aux bounds)
- *     Si la position idéale sort de la salle (derrière un mur), on
- *     rapproche la caméra du joueur sur l'axe player→caméra jusqu'à ce
- *     qu'elle soit dans les bounds. Pas de ray-cast : approximation
- *     simple qui suffit pour une salle rectangulaire.
- *
- *  6. LERPS DISTINCTS PAR AXE
- *     - lerpPosXZ : position horizontale (0.12)
- *     - lerpPosY  : verticale (0.18, plus rapide pour suivre les sauts)
- *     - lerpRot   : rotation (0.04, TRÈS lent — auto-center GTA)
- *
- *  7. PAS DE SNAP
- *     Aucun appel à `snapToTarget` en runtime. Tous les changements
- *     passent par interpolation, même à l'activation initiale (un premier
- *     snap au `enable()` est toléré pour partir d'une position cohérente).
+ *  Si aucun mur n'est fourni, on retombe sur le clamp rectangulaire
+ *  `bounds` (legacy, moins précis mais suffit pour salles rectangulaires
+ *  vides).
  *
  * ========================================================================
- *  CONVENTIONS MATHÉMATIQUES (validées par test)
+ *  FEATURES (inspirées Mario 64 / GTA V)
+ * ========================================================================
+ *
+ *  - Auto-center lent de la rotation (lerpRot)
+ *  - Look-ahead devant le joueur (lookAheadDistance)
+ *  - Deadzone de position (deadzoneRadius)
+ *  - Speed-based distance & hauteur
+ *  - Clamp angulaire maxYawOffsetDeg (empêche la rotation 360°)
+ *
+ * ========================================================================
+ *  CONVENTIONS MATHÉMATIQUES
  * ========================================================================
  *
  *   forward_player(a) = (sin a, 0, cos a)
@@ -59,21 +44,33 @@
 import { lerp, lerpAngle, shortestDeltaDeg } from '../utils/math3d.js';
 
 /**
+ * @typedef {Object} WallSegment
+ * @property {number} x1
+ * @property {number} z1
+ * @property {number} x2
+ * @property {number} z2
+ */
+
+/**
  * @typedef {Object} FollowCameraOptions
  * @property {ReturnType<import('../camera/camera.js').createCamera>} camera
  * @property {{getPosition: () => {x:number,y:number,z:number}, getAngle?: () => number}} target
- * @property {number} [baseDistance=480]        - Distance derrière le joueur
- * @property {number} [baseHeight=-240]         - Offset Y (négatif = au-dessus)
- * @property {number} [lookAheadDistance=400]   - Distance du point de regard devant le joueur
- * @property {number} [deadzoneRadius=30]       - Rayon où la caméra ne bouge pas
- * @property {number} [lerpPosXZ=0.12]          - Lerp position horizontale
- * @property {number} [lerpPosY=0.18]           - Lerp position verticale
- * @property {number} [lerpRot=0.04]            - Lerp rotation (TRÈS lent = effet GTA)
- * @property {number} [tiltDeg=20]              - Inclinaison de regard
- * @property {number} [speedDistanceFactor=0.3] - Pixels de recul par px/s de vitesse
- * @property {number} [speedHeightFactor=0.15]  - Pixels d'abaissement par px/s de vitesse
- * @property {number} [maxSpeedExtraDist=120]   - Cap du recul
- * @property {{minX:number,maxX:number,minZ:number,maxZ:number}} [bounds] - Camera collision
+ * @property {number} [baseDistance=480]
+ * @property {number} [baseHeight=-240]
+ * @property {number} [lookAheadDistance=400]
+ * @property {number} [deadzoneRadius=30]
+ * @property {number} [lerpPosXZ=0.12]
+ * @property {number} [lerpPosY=0.18]
+ * @property {number} [lerpRot=0.04]
+ * @property {number} [tiltDeg=20]
+ * @property {number} [speedDistanceFactor=0.3]
+ * @property {number} [speedHeightFactor=0.15]
+ * @property {number} [maxSpeedExtraDist=120]
+ * @property {number} [maxYawOffsetDeg=45]       - Clamp angulaire autour de idealRy
+ * @property {number} [wallPadding=40]            - Marge caméra↔mur (px)
+ * @property {number} [minDistanceToPlayer=120]   - Caméra ne se rapproche jamais plus près
+ * @property {WallSegment[]} [walls]              - Murs pour le raycast (PRIORITAIRE)
+ * @property {{minX:number,maxX:number,minZ:number,maxZ:number}} [bounds] - Fallback rectangulaire
  */
 
 /**
@@ -83,10 +80,6 @@ export function createFollowCamera(options) {
   const camera = options.camera;
   const target = options.target;
 
-
-  let maxYawOffsetDeg = options.maxYawOffsetDeg ?? 45;
-
-  // Paramètres de comportement
   let baseDistance = options.baseDistance ?? 480;
   let baseHeight = options.baseHeight ?? -240;
   let lookAheadDistance = options.lookAheadDistance ?? 400;
@@ -98,18 +91,18 @@ export function createFollowCamera(options) {
   let speedDistanceFactor = options.speedDistanceFactor ?? 0.3;
   let speedHeightFactor = options.speedHeightFactor ?? 0.15;
   let maxSpeedExtraDist = options.maxSpeedExtraDist ?? 120;
+  let maxYawOffsetDeg = options.maxYawOffsetDeg ?? 45;
+  let wallPadding = options.wallPadding ?? 40;
+  let minDistanceToPlayer = options.minDistanceToPlayer ?? 120;
+  let walls = options.walls ? options.walls.map((w) => ({ ...w })) : null;
   let bounds = options.bounds ?? null;
 
-  /** Position filtrée de la caméra (ce qui est réellement appliqué). */
   let curX = 0, curY = baseHeight, curZ = 0, curRy = 0;
-
-  /** Distance courante (varie avec la vitesse). */
   let curDistance = baseDistance;
   let curHeightAdd = 0;
 
-  /** Pour mesurer la vitesse du joueur. */
   let prevPlayerX = 0, prevPlayerZ = 0;
-  let curSpeed = 0; // pixels / seconde (filtrée)
+  let curSpeed = 0;
 
   let enabled = false;
   let firstFrame = true;
@@ -121,7 +114,6 @@ export function createFollowCamera(options) {
   function enable() {
     enabled = true;
     firstFrame = true;
-    // Initialise prev pos
     const p = target.getPosition();
     prevPlayerX = p.x;
     prevPlayerZ = p.z;
@@ -132,19 +124,15 @@ export function createFollowCamera(options) {
     enabled = false;
   }
 
-  /**
-   * Premier placement — SEULEMENT utilisé à l'activation initiale pour
-   * éviter une trajectoire bizarre depuis (0,0,0) vers la cible.
-   */
   function snapToTarget() {
     const { idealPos, idealLookAt } = computeIdeal();
-    curX = idealPos.x;
-    curY = idealPos.y;
-    curZ = idealPos.z;
+    const safePos = resolveCollisions(idealPos, target.getPosition());
+    curX = safePos.x;
+    curY = safePos.y;
+    curZ = safePos.z;
     curDistance = baseDistance;
     curHeightAdd = 0;
-    // Rotation initiale = regarde vers le look-at immédiatement
-    curRy = computeRyTo(idealPos, idealLookAt);
+    curRy = computeRyTo(safePos, idealLookAt);
   }
 
   /**
@@ -154,7 +142,7 @@ export function createFollowCamera(options) {
     if (!enabled) return;
     const dt = Math.max(0.001, dtMs / 1000);
 
-    // ---------- 1) Mesure de la vitesse du joueur ----------
+    // 1) Mesure vitesse
     const p = target.getPosition();
     if (firstFrame) {
       prevPlayerX = p.x;
@@ -167,127 +155,178 @@ export function createFollowCamera(options) {
     const dx = p.x - prevPlayerX;
     const dz = p.z - prevPlayerZ;
     const instSpeed = Math.hypot(dx, dz) / dt;
-    // Lisse la vitesse (évite les pics sur un seul frame lent)
     curSpeed = lerp(curSpeed, instSpeed, 0.15);
     prevPlayerX = p.x;
     prevPlayerZ = p.z;
 
-    // ---------- 2) Distance et hauteur adaptatives à la vitesse ----------
+    // 2) Distance/hauteur adaptatives
     const extraDist = Math.min(maxSpeedExtraDist, curSpeed * speedDistanceFactor);
     const extraHeight = Math.min(maxSpeedExtraDist * 0.5, curSpeed * speedHeightFactor);
     curDistance = lerp(curDistance, baseDistance + extraDist, 0.08);
     curHeightAdd = lerp(curHeightAdd, extraHeight, 0.08);
 
-    // ---------- 3) Calcule position idéale et lookAt ----------
+    // 3) Position idéale + lookAt
     const { idealPos, idealLookAt } = computeIdeal();
 
-    // ---------- 4) Camera collision (clamp aux bounds) ----------
-    const clampedPos = applyBoundsCollision(idealPos, p);
+    // 4) COLLISION — la position idéale est-elle atteignable sans
+    //    traverser un mur ? Si non, on la rapproche du joueur.
+    const safePos = resolveCollisions(idealPos, p);
 
-    // ---------- 5) Deadzone de position ----------
-    const distToIdeal = Math.hypot(clampedPos.x - curX, clampedPos.z - curZ);
+    // 5) Deadzone
+    const distToIdeal = Math.hypot(safePos.x - curX, safePos.z - curZ);
     const posLerp = (distToIdeal > deadzoneRadius) ? lerpPosXZ : 0;
 
-    curX = lerp(curX, clampedPos.x, posLerp);
-    curZ = lerp(curZ, clampedPos.z, posLerp);
-    curY = lerp(curY, clampedPos.y, lerpPosY); // Y toujours rapide, pas de deadzone
+    curX = lerp(curX, safePos.x, posLerp);
+    curZ = lerp(curZ, safePos.z, posLerp);
+    curY = lerp(curY, safePos.y, lerpPosY);
 
-    if (bounds) {
-      curX = Math.max(bounds.minX, Math.min(bounds.maxX, curX));
-      curZ = Math.max(bounds.minZ, Math.min(bounds.maxZ, curZ));
-    }
+    // 6) SAFETY NET : si le lerp a laissé la caméra de l'autre côté d'un
+    //    mur (cas limite où safePos était côté joueur mais curX/Z reste
+    //    coincé derrière), on RE-RESOUD depuis la position lerpée vers
+    //    le joueur. Cette passe finale garantit "jamais de traversée".
+    const finalSafe = resolveCollisions({ x: curX, y: curY, z: curZ }, p);
+    curX = finalSafe.x;
+    curZ = finalSafe.z;
 
-    // ---------- 6) Rotation vers le lookAt, TRÈS LENTE ----------
-    // APRÈS
+    // 7) Rotation clampée
     const idealRy = computeRyTo({ x: curX, z: curZ }, idealLookAt);
     curRy = lerpAngle(curRy, idealRy, lerpRot);
-
-    // Clamp : curRy ne peut jamais s'écarter de plus de maxYawOffsetDeg
-    // de l'angle idéal (= derrière le joueur). On calcule l'écart court
-    // et on le borne.
     const delta = shortestDeltaDeg(idealRy, curRy);
-    if (delta > maxYawOffsetDeg) {
-      curRy = idealRy + maxYawOffsetDeg;
-    } else if (delta < -maxYawOffsetDeg) {
-      curRy = idealRy - maxYawOffsetDeg;
-    }
+    if (delta > maxYawOffsetDeg) curRy = idealRy + maxYawOffsetDeg;
+    else if (delta < -maxYawOffsetDeg) curRy = idealRy - maxYawOffsetDeg;
 
-    // ---------- 7) Apply ----------
     apply();
   }
 
   // ---------------------------------------------------------------------
-  // COMPUTATIONS
+  // COLLISION — raycast contre les murs
   // ---------------------------------------------------------------------
 
   /**
-   * Calcule la position idéale de la caméra (derrière le perso sur son
-   * forward, avec corrections vitesse) et le point de regard (devant lui).
+   * Prend la position idéale de la caméra et la rapproche du joueur
+   * jusqu'à ce qu'elle ne traverse plus aucun mur, avec une marge.
+   *
+   * Algorithme :
+   *   1. Raycast depuis le joueur vers la position idéale.
+   *   2. Pour chaque mur, calcul de l'intersection segment-segment.
+   *   3. On garde le t minimum (intersection la plus proche du joueur).
+   *   4. Si t < 1, on place la caméra à (joueur + dir × t × dist - padding).
+   *   5. On applique aussi le clamp rectangulaire `bounds` en dernier recours.
+   *   6. On respecte la distance minimale au joueur pour éviter que la
+   *      caméra soit "dans le joueur" quand un mur est très proche.
+   *
+   * @param {{x:number, y:number, z:number}} idealPos
+   * @param {{x:number, y:number, z:number}} playerPos
    */
+  function resolveCollisions(idealPos, playerPos) {
+    let resultX = idealPos.x;
+    let resultY = idealPos.y;
+    let resultZ = idealPos.z;
+
+    if (walls && walls.length > 0) {
+      const dirX = idealPos.x - playerPos.x;
+      const dirZ = idealPos.z - playerPos.z;
+      const rayLen = Math.hypot(dirX, dirZ);
+
+      if (rayLen > 0.001) {
+        // Cherche le t le plus petit en [0, 1] où le rayon touche un mur.
+        let closestT = 1;
+        for (let i = 0; i < walls.length; i++) {
+          const w = walls[i];
+          const t = raySegmentIntersect(
+            playerPos.x, playerPos.z,
+            idealPos.x,  idealPos.z,
+            w.x1, w.z1, w.x2, w.z2,
+          );
+          if (t != null && t < closestT) closestT = t;
+        }
+
+        // On applique padding pour que la caméra reste devant le mur.
+        // Padding converti en fraction du rayon.
+        const paddingT = wallPadding / rayLen;
+        let safeT = closestT - paddingT;
+
+        // Distance minimale au joueur
+        const minT = minDistanceToPlayer / rayLen;
+        if (safeT < minT) safeT = Math.min(minT, 1);
+
+        // Si closestT était très petit (mur collé au joueur), on peut
+        // avoir safeT négatif. On clamp à minT.
+        if (safeT < 0) safeT = 0;
+        if (safeT > 1) safeT = 1;
+
+        resultX = playerPos.x + dirX * safeT;
+        resultZ = playerPos.z + dirZ * safeT;
+      }
+    } else if (bounds) {
+      // Fallback legacy : clamp rectangulaire dur
+      resultX = Math.max(bounds.minX, Math.min(bounds.maxX, resultX));
+      resultZ = Math.max(bounds.minZ, Math.min(bounds.maxZ, resultZ));
+    }
+
+    // Filet de sécurité supplémentaire : clamp bounds même si on a les murs
+    if (bounds) {
+      resultX = Math.max(bounds.minX, Math.min(bounds.maxX, resultX));
+      resultZ = Math.max(bounds.minZ, Math.min(bounds.maxZ, resultZ));
+    }
+
+    return { x: resultX, y: resultY, z: resultZ };
+  }
+
+  /**
+   * Intersection rayon [A, B] contre segment [C, D] dans le plan XZ.
+   * Retourne le paramètre t ∈ [0, 1] sur le rayon où a lieu l'intersection,
+   * ou null si pas d'intersection.
+   *
+   * Algorithme standard segment-segment 2D :
+   *   A + t (B-A) = C + u (D-C)
+   *   Résolu en t et u ; l'intersection n'est valide que si
+   *   t ∈ [0, 1] ET u ∈ [0, 1].
+   */
+  function raySegmentIntersect(ax, az, bx, bz, cx, cz, dx, dz) {
+    const rx = bx - ax, rz = bz - az;
+    const sx = dx - cx, sz = dz - cz;
+    const denom = rx * sz - rz * sx;
+    if (Math.abs(denom) < 1e-6) return null; // parallèles
+    const t = ((cx - ax) * sz - (cz - az) * sx) / denom;
+    const u = ((cx - ax) * rz - (cz - az) * rx) / denom;
+    if (t < 0 || t > 1) return null;
+    if (u < 0 || u > 1) return null;
+    return t;
+  }
+
+  // ---------------------------------------------------------------------
+  // COMPUTATIONS (position/rotation idéales)
+  // ---------------------------------------------------------------------
+
   function computeIdeal() {
     const p = target.getPosition();
     const angle = target.getAngle ? target.getAngle() : 0;
 
-    // forward_player = (sin a, 0, cos a)
     const fwdX = Math.sin(angle);
     const fwdZ = Math.cos(angle);
 
     const idealPos = {
       x: p.x - fwdX * curDistance,
-      y: p.y + baseHeight - curHeightAdd, // Y négatif = haut, on baisse un peu
+      y: p.y + baseHeight - curHeightAdd,
       z: p.z - fwdZ * curDistance,
     };
 
     const idealLookAt = {
       x: p.x + fwdX * lookAheadDistance,
-      y: p.y, // le lookAt reste à hauteur du joueur
+      y: p.y,
       z: p.z + fwdZ * lookAheadDistance,
     };
 
     return { idealPos, idealLookAt };
   }
 
-  /**
-   * ry pour que la caméra en `camPos` regarde vers `lookAt`.
-   * ry_deg = atan2(dx, -dz) × 180 / π
-   *
-   * @param {{x:number, z:number}} camPos
-   * @param {{x:number, z:number}} lookAt
-   */
   function computeRyTo(camPos, lookAt) {
     const dx = lookAt.x - camPos.x;
     const dz = lookAt.z - camPos.z;
     if (Math.abs(dx) < 0.0001 && Math.abs(dz) < 0.0001) return curRy;
     const rad = Math.atan2(dx, -dz);
     return (rad * 180) / Math.PI;
-  }
-
-  /**
-   * Camera collision simple : si la position idéale sort des bounds,
-   * on glisse vers le joueur le long du vecteur player→caméra jusqu'à
-   * être dans la salle.
-   *
-   * @param {{x:number, y:number, z:number}} idealPos
-   * @param {{x:number, y:number, z:number}} playerPos
-   */
-  function applyBoundsCollision(idealPos, playerPos) {
-    if (!bounds) return idealPos;
-  
-    const { minX, maxX, minZ, maxZ } = bounds;
-  
-    // Clamp dur : on prend la position idéale, et on la ramène dans les bounds
-    // même si ça signifie que la caméra se rapproche du joueur.
-    const clampedX = Math.max(minX, Math.min(maxX, idealPos.x));
-    const clampedZ = Math.max(minZ, Math.min(maxZ, idealPos.z));
-  
-    // On accepte que la caméra soit plus proche du joueur que baseDistance
-    // dans ce cas (coin de salle, mur dans le dos). Elle ne passera JAMAIS
-    // à travers le mur.
-    return {
-      x: clampedX,
-      y: idealPos.y,
-      z: clampedZ,
-    };
   }
 
   function apply() {
@@ -302,7 +341,7 @@ export function createFollowCamera(options) {
   }
 
   // ---------------------------------------------------------------------
-  // TWEAKING — API exposée pour la console
+  // TWEAKING
   // ---------------------------------------------------------------------
 
   function setBaseDistance(d) { baseDistance = d; }
@@ -310,6 +349,9 @@ export function createFollowCamera(options) {
   function setLookAhead(d) { lookAheadDistance = d; }
   function setDeadzone(r) { deadzoneRadius = r; }
   function setTilt(deg) { tiltDeg = deg; }
+  function setYawLimit(deg) { maxYawOffsetDeg = deg; }
+  function setWallPadding(px) { wallPadding = px; }
+  function setMinDistance(px) { minDistanceToPlayer = px; }
   function setLerp(cfg) {
     if (typeof cfg.posXZ === 'number') lerpPosXZ = cfg.posXZ;
     if (typeof cfg.posY === 'number') lerpPosY = cfg.posY;
@@ -321,12 +363,15 @@ export function createFollowCamera(options) {
     if (typeof cfg.maxExtraDist === 'number') maxSpeedExtraDist = cfg.maxExtraDist;
   }
   function setBounds(b) { bounds = b; }
+  function setWalls(w) { walls = Array.isArray(w) ? w.map((x) => ({ ...x })) : null; }
 
   function getStatus() {
     return {
       baseDistance, baseHeight, lookAheadDistance, deadzoneRadius, tiltDeg,
       lerpPosXZ, lerpPosY, lerpRot,
       speedDistanceFactor, speedHeightFactor, maxSpeedExtraDist,
+      maxYawOffsetDeg, wallPadding, minDistanceToPlayer,
+      wallCount: walls ? walls.length : 0,
       curSpeed: Math.round(curSpeed),
       curDistance: Math.round(curDistance),
       curHeightAdd: Math.round(curHeightAdd),
@@ -352,9 +397,13 @@ export function createFollowCamera(options) {
     setLookAhead,
     setDeadzone,
     setTilt,
+    setYawLimit,
+    setWallPadding,
+    setMinDistance,
     setLerp,
     setSpeedEffect,
     setBounds,
+    setWalls,
     getStatus,
   });
 }

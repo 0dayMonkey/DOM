@@ -13,6 +13,7 @@
     --ok: #2DB92D;
     --muted: #8888AA;
     --wall: #8B4513;
+    --wall-hidden: #555;
     --floor-a: #F4E4BC;
     --floor-b: #C09060;
     --painting: #B048E0;
@@ -21,7 +22,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; background: var(--bg); color: var(--text);
     font-family: -apple-system, Segoe UI, Roboto, sans-serif; overflow: hidden; }
-  body { display: grid; grid-template-columns: 260px 1fr 320px; }
+  body { display: grid; grid-template-columns: 280px 1fr 340px; }
 
   .panel {
     background: var(--panel); padding: 16px; overflow-y: auto;
@@ -41,7 +42,7 @@
   .tool .key { background: rgba(0,0,0,0.2); padding: 1px 6px; border-radius: 2px;
     font-family: monospace; font-size: 11px; }
   .row { display: flex; gap: 8px; align-items: center; font-size: 13px; }
-  .row label { min-width: 80px; color: var(--muted); }
+  .row label { min-width: 90px; color: var(--muted); }
   .row input[type="number"], .row input[type="text"] {
     flex: 1; background: #1A1A2E; border: 1px solid #444; color: var(--text);
     padding: 6px 8px; font-family: inherit; font-size: 12px;
@@ -50,6 +51,15 @@
     flex: 1; background: #1A1A2E; border: 1px solid #444; color: var(--text);
     padding: 6px 8px; font-family: inherit; font-size: 12px;
   }
+  .row input[type="checkbox"] {
+    width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer;
+  }
+  .toggle-row {
+    display: flex; gap: 10px; align-items: center; font-size: 13px;
+    padding: 6px 8px; background: #1A1A2E; border: 1px solid #444; cursor: pointer;
+  }
+  .toggle-row:hover { background: #232338; }
+  .toggle-row label { flex: 1; color: var(--text); cursor: pointer; }
   .btn {
     background: var(--accent); color: #1A1A2E; border: 2px solid #000;
     padding: 10px; cursor: pointer; font-weight: bold; font-family: inherit;
@@ -66,10 +76,10 @@
     position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7);
     padding: 6px 12px; font-family: monospace; font-size: 12px; pointer-events: none;
   }
-  .hud--right { left: auto; right: 10px; }
+  .hud--right { left: auto; right: 10px; max-width: 60%; }
 
   textarea {
-    width: 100%; min-height: 300px; background: #0E0E1A; color: var(--text);
+    width: 100%; min-height: 220px; background: #0E0E1A; color: var(--text);
     border: 1px solid #444; padding: 8px; font-family: monospace; font-size: 11px;
     resize: vertical;
   }
@@ -98,10 +108,41 @@
   <button class="tool" data-tool="spawn"><span class="key">S</span> Spawn</button>
   <button class="tool" data-tool="delete"><span class="key">D</span> Supprimer</button>
 
-  <h2>Floor</h2>
+  <h2>Dimensions</h2>
   <div class="row"><label>Largeur (X)</label><input type="number" id="floor-w" value="1600" step="100" /></div>
   <div class="row"><label>Profondeur (Z)</label><input type="number" id="floor-d" value="2000" step="100" /></div>
   <div class="row"><label>Hauteur murs</label><input type="number" id="wall-h" value="800" step="50" /></div>
+
+  <h2>Environnement</h2>
+  <div class="toggle-row">
+    <input type="checkbox" id="env-floor" checked />
+    <label for="env-floor">Sol visible</label>
+  </div>
+  <div class="row"><label>Motif sol</label>
+    <select id="floor-pattern">
+      <option value="checker" selected>Damier</option>
+      <option value="solid">Uni</option>
+      <option value="wood">Bois</option>
+    </select>
+  </div>
+  <div class="toggle-row">
+    <input type="checkbox" id="env-ceiling" checked />
+    <label for="env-ceiling">Plafond visible</label>
+  </div>
+
+  <h2>Décorations</h2>
+  <div class="toggle-row">
+    <input type="checkbox" id="deco-pillars" />
+    <label for="deco-pillars">Piliers aux coins</label>
+  </div>
+  <div class="toggle-row">
+    <input type="checkbox" id="deco-carpet" />
+    <label for="deco-carpet">Tapis central</label>
+  </div>
+  <div class="toggle-row">
+    <input type="checkbox" id="deco-entry-rug" />
+    <label for="deco-entry-rug">Tapis d'entrée</label>
+  </div>
 
   <h2>Vue</h2>
   <div class="row"><label>Zoom</label><input type="range" id="zoom" min="0.1" max="2" step="0.05" value="0.4" style="flex:1"/></div>
@@ -128,17 +169,24 @@
 
   <h2>JSON</h2>
   <textarea id="json"></textarea>
+
   <div class="row">
-    <button class="btn btn--ok" id="btn-copy">Copier</button>
-    <button class="btn" id="btn-apply">Importer</button>
+    <button class="btn btn--ok" id="btn-apply-game" style="flex:1">APPLIQUER AU JEU</button>
   </div>
-  <button class="btn" id="btn-download">Télécharger hub.json</button>
+  <div class="row">
+    <button class="btn" id="btn-copy" style="flex:1">Copier</button>
+    <button class="btn" id="btn-apply" style="flex:1">Importer</button>
+  </div>
+  <button class="btn btn--ghost" id="btn-download">Télécharger hub.json</button>
+  <button class="btn btn--ghost" id="btn-clear-storage">Réinitialiser map du jeu</button>
+  <div class="small" id="storage-status"></div>
 
   <div class="sep"></div>
   <div class="small">
     <b>Coordonnées :</b> même repère que le jeu.<br>
     X+ droite, Z+ avant (vers l'écran), Z- fond.<br>
-    Origine au centre de la salle.
+    Origine au centre de la salle.<br>
+    <b>Murs masqués</b> = collision sans rendu visuel.
   </div>
 </aside>
 
@@ -149,17 +197,29 @@
 
 const state = {
   tool: 'select',
-  floor: { width: 1600, depth: 2000, wallHeight: 800 },
-  walls: [],           // [{x1,z1,x2,z2}]
+  floor: {
+    width: 1600,
+    depth: 2000,
+    wallHeight: 800,
+    visible: true,
+    pattern: 'checker',
+  },
+  ceiling: { visible: true },
+  decorations: {
+    pillars: false,
+    centerCarpet: false,
+    entryRug: false,
+  },
+  walls: [],           // [{x1,z1,x2,z2, visible:true}]
   paintings: [],       // [{id,label,mode,x,z,rotationY}]
   spawn: { x: 0, z: 400, angle: 180 },
-  // edit state
-  drawingWall: null,   // {x1,z1} quand on est au 2e clic
-  selected: null,      // {type:'wall'|'painting'|'spawn', index}
-  dragging: null,      // {type, index, grabOffsetX, grabOffsetZ} or {type:'wall-endpoint', index, which:'a'|'b'}
-  // view
+
+  drawingWall: null,
+  selected: null,
+  dragging: null,
+
   view: { cx: 0, cz: 0, zoom: 0.4 },
-  panning: null,       // {mx, my, cx, cz}
+  panning: null,
   spacePressed: false,
   grid: 100,
   mouseWorld: { x: 0, z: 0 },
@@ -169,14 +229,18 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
 // ============================================================================
-// VIEW TRANSFORMS
+// VIEW
 // ============================================================================
 
 function resize() {
   const r = canvas.parentElement.getBoundingClientRect();
-  canvas.width = r.width;
-  canvas.height = r.height;
-  draw();
+  canvas.width = r.width || 800;
+  canvas.height = r.height || 600;
+  if (canvas.width > 50 && canvas.height > 50) {
+    fitViewToMap();
+  } else {
+    draw();
+  }
 }
 window.addEventListener('resize', resize);
 
@@ -197,6 +261,34 @@ function snap(v) {
   return g > 0 ? Math.round(v / g) * g : Math.round(v);
 }
 
+function fitViewToMap() {
+  let minX = -state.floor.width / 2;
+  let maxX =  state.floor.width / 2;
+  let minZ = -state.floor.depth / 2;
+  let maxZ =  state.floor.depth / 2;
+
+  const expand = (x, z) => {
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+  };
+  state.walls.forEach((w) => { expand(w.x1, w.z1); expand(w.x2, w.z2); });
+  state.paintings.forEach((p) => expand(p.x, p.z));
+  expand(state.spawn.x, state.spawn.z);
+
+  const boxW = maxX - minX;
+  const boxH = maxZ - minZ;
+  const margin = 1.15;
+
+  const zoomX = canvas.width  / (boxW * margin || 1);
+  const zoomZ = canvas.height / (boxH * margin || 1);
+  state.view.zoom = Math.max(0.05, Math.min(3, Math.min(zoomX, zoomZ)));
+  state.view.cx = (minX + maxX) / 2;
+  state.view.cz = (minZ + maxZ) / 2;
+
+  document.getElementById('zoom').value = state.view.zoom;
+  draw();
+}
+
 // ============================================================================
 // DRAW
 // ============================================================================
@@ -204,14 +296,13 @@ function snap(v) {
 function draw() {
   ctx.fillStyle = '#0E0E1A';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-
   drawGrid();
   drawFloor();
+  drawDecorations();
   drawWalls();
   drawPaintings();
   drawSpawn();
   drawDrawingWall();
-  drawSelection();
 }
 
 function drawGrid() {
@@ -236,9 +327,7 @@ function drawGrid() {
   }
   ctx.stroke();
 
-  // Axes
   ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-  ctx.lineWidth = 1;
   const ox = worldToScreen(0, tl.z);
   const oxb = worldToScreen(0, br.z);
   const oz = worldToScreen(tl.x, 0);
@@ -253,27 +342,97 @@ function drawFloor() {
   const w = state.floor.width, d = state.floor.depth;
   const a = worldToScreen(-w / 2, -d / 2);
   const b = worldToScreen(w / 2, d / 2);
-  // damier
-  const tile = 128 * state.view.zoom;
-  const pat = document.createElement('canvas');
-  pat.width = pat.height = 128;
-  const pc = pat.getContext('2d');
-  pc.fillStyle = '#F4E4BC'; pc.fillRect(0, 0, 64, 64); pc.fillRect(64, 64, 64, 64);
-  pc.fillStyle = '#C09060'; pc.fillRect(64, 0, 64, 64); pc.fillRect(0, 64, 64, 64);
-  const pattern = ctx.createPattern(pat, 'repeat');
-  ctx.save();
-  ctx.globalAlpha = 0.25;
-  ctx.fillStyle = pattern;
-  ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
-  ctx.restore();
-  // contour sol
+
+  if (state.floor.visible) {
+    if (state.floor.pattern === 'checker') {
+      const pat = document.createElement('canvas');
+      pat.width = pat.height = 128;
+      const pc = pat.getContext('2d');
+      pc.fillStyle = '#F4E4BC'; pc.fillRect(0, 0, 64, 64); pc.fillRect(64, 64, 64, 64);
+      pc.fillStyle = '#C09060'; pc.fillRect(64, 0, 64, 64); pc.fillRect(0, 64, 64, 64);
+      const pattern = ctx.createPattern(pat, 'repeat');
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = pattern;
+      ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      ctx.restore();
+    } else if (state.floor.pattern === 'wood') {
+      ctx.save();
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = '#8B4513';
+      ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.globalAlpha = 0.15;
+      ctx.fillStyle = '#F4E4BC';
+      ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      ctx.restore();
+    }
+  }
+
   ctx.strokeStyle = '#F0C040';
   ctx.lineWidth = 2;
   ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
-  // label
+
   ctx.fillStyle = '#F0C040';
   ctx.font = '11px monospace';
-  ctx.fillText(`${w} × ${d}`, a.x + 6, a.y + 14);
+  ctx.fillText(`${w} × ${d}  ${state.floor.visible ? '' : '(sol masqué)'}`, a.x + 6, a.y + 14);
+}
+
+function drawDecorations() {
+  const w = state.floor.width, d = state.floor.depth;
+
+  // Tapis central
+  if (state.decorations.centerCarpet) {
+    const cW = Math.round(w * 0.3);
+    const cD = Math.round(d * 0.8);
+    const a = worldToScreen(-cW / 2, -cD / 2);
+    const b = worldToScreen(cW / 2, cD / 2);
+    ctx.save();
+    ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#C8102E';
+    ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    ctx.strokeStyle = '#F0C040';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    ctx.restore();
+  }
+
+  // Tapis d'entrée (près du spawn)
+  if (state.decorations.entryRug) {
+    const rugX = -120, rugZ = d / 2 - 260 - 80;
+    const rugW = 240, rugD = 160;
+    const a = worldToScreen(rugX, rugZ);
+    const b = worldToScreen(rugX + rugW, rugZ + rugD);
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#C8102E';
+    ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    ctx.strokeStyle = '#F0C040';
+    ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    ctx.restore();
+  }
+
+  // Piliers aux coins
+  if (state.decorations.pillars) {
+    const inset = 200;
+    const pillars = [
+      { x: -w / 2 + inset, z: -d / 2 + inset },
+      { x:  w / 2 - inset, z: -d / 2 + inset },
+      { x: -w / 2 + inset, z:  d / 2 - inset },
+      { x:  w / 2 - inset, z:  d / 2 - inset },
+    ];
+    pillars.forEach((p) => {
+      const pos = worldToScreen(p.x, p.z);
+      ctx.fillStyle = '#8B4513';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      const size = 30 * state.view.zoom;
+      ctx.fillRect(pos.x - size / 2, pos.y - size / 2, size, size);
+      ctx.strokeRect(pos.x - size / 2, pos.y - size / 2, size, size);
+    });
+  }
 }
 
 function drawWalls() {
@@ -281,13 +440,21 @@ function drawWalls() {
     const a = worldToScreen(w.x1, w.z1);
     const b = worldToScreen(w.x2, w.z2);
     const isSel = state.selected?.type === 'wall' && state.selected.index === i;
-    ctx.strokeStyle = isSel ? '#F0C040' : '#8B4513';
+    const visible = w.visible !== false;
+
+    ctx.save();
+    ctx.strokeStyle = isSel ? '#F0C040' : (visible ? '#8B4513' : '#555');
     ctx.lineWidth = isSel ? 10 : 8;
     ctx.lineCap = 'round';
+    if (!visible) {
+      ctx.setLineDash([12, 8]);
+      ctx.globalAlpha = 0.7;
+    }
     ctx.beginPath();
     ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
     ctx.stroke();
-    // endpoints (uniquement si sélectionné)
+    ctx.restore();
+
     if (isSel) {
       ctx.fillStyle = '#F0C040';
       [a, b].forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill(); });
@@ -308,13 +475,11 @@ function drawPaintings() {
     ctx.lineWidth = isSel ? 3 : 2;
     ctx.fillRect(-size, -4, size * 2, 8);
     ctx.strokeRect(-size, -4, size * 2, 8);
-    // "facing arrow" vers +Z local (direction naturelle = face devant le tableau)
     ctx.strokeStyle = '#FFF';
     ctx.beginPath();
     ctx.moveTo(0, 0); ctx.lineTo(0, 25);
     ctx.stroke();
     ctx.restore();
-    // label
     ctx.fillStyle = '#FFF';
     ctx.font = '11px monospace';
     ctx.textAlign = 'center';
@@ -331,7 +496,6 @@ function drawSpawn() {
   ctx.strokeStyle = isSel ? '#F0C040' : '#000';
   ctx.lineWidth = isSel ? 3 : 2;
   ctx.beginPath(); ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  // flèche direction
   const rad = ((state.spawn.angle ?? 0) * Math.PI) / 180;
   const tipX = pos.x + Math.sin(rad) * (r + 14);
   const tipY = pos.y + Math.cos(rad) * (r + 14);
@@ -353,10 +517,6 @@ function drawDrawingWall() {
   ctx.setLineDash([8, 6]);
   ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(m.x, m.y); ctx.stroke();
   ctx.setLineDash([]);
-}
-
-function drawSelection() {
-  // rien, géré par highlight des items
 }
 
 function modeColor(m) {
@@ -381,17 +541,12 @@ function distToSegment(px, pz, x1, z1, x2, z2) {
 }
 
 function hitTest(wx, wz) {
-  const tol = 20 / state.view.zoom; // 20px écran
-
-  // Priorité : spawn > painting > wall endpoint > wall
-  if (Math.hypot(wx - state.spawn.x, wz - state.spawn.z) < tol) {
-    return { type: 'spawn' };
-  }
+  const tol = 20 / state.view.zoom;
+  if (Math.hypot(wx - state.spawn.x, wz - state.spawn.z) < tol) return { type: 'spawn' };
   for (let i = state.paintings.length - 1; i >= 0; i--) {
     const p = state.paintings[i];
     if (Math.hypot(wx - p.x, wz - p.z) < tol) return { type: 'painting', index: i };
   }
-  // wall endpoints quand un mur est sélectionné
   if (state.selected?.type === 'wall') {
     const w = state.walls[state.selected.index];
     if (w) {
@@ -457,7 +612,6 @@ canvas.addEventListener('mousedown', (e) => {
   const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
   const w = screenToWorld(sx, sy);
 
-  // Pan (clic milieu OU espace+clic gauche)
   if (e.button === 1 || (e.button === 0 && state.spacePressed)) {
     state.panning = { mx: sx, my: sy, cx: state.view.cx, cz: state.view.cz };
     canvas.style.cursor = 'grabbing';
@@ -466,14 +620,13 @@ canvas.addEventListener('mousedown', (e) => {
   }
 
   if (e.button !== 0) return;
-
   const sxw = snap(w.x), szw = snap(w.z);
 
   if (state.tool === 'wall') {
     if (!state.drawingWall) {
       state.drawingWall = { x1: sxw, z1: szw };
     } else {
-      state.walls.push({ x1: state.drawingWall.x1, z1: state.drawingWall.z1, x2: sxw, z2: szw });
+      state.walls.push({ x1: state.drawingWall.x1, z1: state.drawingWall.z1, x2: sxw, z2: szw, visible: true });
       state.drawingWall = null;
       exportJson();
     }
@@ -505,8 +658,8 @@ canvas.addEventListener('mousedown', (e) => {
 
   if (state.tool === 'delete') {
     const h = hitTest(w.x, w.z);
-    if (h?.type === 'wall') { state.walls.splice(h.index, 1); }
-    else if (h?.type === 'painting') { state.paintings.splice(h.index, 1); }
+    if (h?.type === 'wall') state.walls.splice(h.index, 1);
+    else if (h?.type === 'painting') state.paintings.splice(h.index, 1);
     state.selected = null;
     updateSelectionBox();
     exportJson();
@@ -514,12 +667,10 @@ canvas.addEventListener('mousedown', (e) => {
     return;
   }
 
-  // select tool (ou clic en mode wall sans drawing)
   const h = hitTest(w.x, w.z);
   if (h) {
     state.selected = h;
     updateSelectionBox();
-    // start drag
     if (h.type === 'painting') state.dragging = { type: 'painting', index: h.index };
     else if (h.type === 'spawn') state.dragging = { type: 'spawn' };
     else if (h.type === 'wall') state.dragging = { type: 'wall', index: h.index, lastX: sxw, lastZ: szw };
@@ -551,7 +702,6 @@ canvas.addEventListener('wheel', (e) => {
   draw();
 }, { passive: false });
 
-// Keyboard
 window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (e.key === ' ') { state.spacePressed = true; canvas.style.cursor = 'grab'; e.preventDefault(); }
@@ -572,7 +722,7 @@ window.addEventListener('keyup', (e) => {
 });
 
 // ============================================================================
-// UI
+// UI WIRING
 // ============================================================================
 
 function selectTool(name) {
@@ -585,6 +735,7 @@ function selectTool(name) {
 document.querySelectorAll('.tool').forEach(b =>
   b.addEventListener('click', () => selectTool(b.dataset.tool)));
 
+// Dimensions
 document.getElementById('floor-w').addEventListener('input', (e) => {
   state.floor.width = +e.target.value || 1600; exportJson(); draw();
 });
@@ -594,15 +745,37 @@ document.getElementById('floor-d').addEventListener('input', (e) => {
 document.getElementById('wall-h').addEventListener('input', (e) => {
   state.floor.wallHeight = +e.target.value || 800; exportJson();
 });
+
+// Environnement
+document.getElementById('env-floor').addEventListener('change', (e) => {
+  state.floor.visible = e.target.checked; exportJson(); draw();
+});
+document.getElementById('floor-pattern').addEventListener('change', (e) => {
+  state.floor.pattern = e.target.value; exportJson(); draw();
+});
+document.getElementById('env-ceiling').addEventListener('change', (e) => {
+  state.ceiling.visible = e.target.checked; exportJson();
+});
+
+// Décorations
+document.getElementById('deco-pillars').addEventListener('change', (e) => {
+  state.decorations.pillars = e.target.checked; exportJson(); draw();
+});
+document.getElementById('deco-carpet').addEventListener('change', (e) => {
+  state.decorations.centerCarpet = e.target.checked; exportJson(); draw();
+});
+document.getElementById('deco-entry-rug').addEventListener('change', (e) => {
+  state.decorations.entryRug = e.target.checked; exportJson(); draw();
+});
+
+// Vue
 document.getElementById('zoom').addEventListener('input', (e) => {
   state.view.zoom = +e.target.value; draw();
 });
 document.getElementById('grid').addEventListener('input', (e) => {
   state.grid = +e.target.value || 0; draw();
 });
-document.getElementById('btn-center').addEventListener('click', () => {
-  state.view.cx = 0; state.view.cz = 0; draw();
-});
+document.getElementById('btn-center').addEventListener('click', () => fitViewToMap());
 document.getElementById('btn-reset').addEventListener('click', () => {
   if (!confirm('Tout effacer ?')) return;
   state.walls = []; state.paintings = []; state.selected = null;
@@ -616,20 +789,14 @@ document.getElementById('btn-copy').addEventListener('click', async () => {
     const b = document.getElementById('btn-copy');
     const t = b.textContent; b.textContent = 'Copié !';
     setTimeout(() => b.textContent = t, 1000);
-  } catch (_) { alert('Clipboard refusé, sélectionne le texte manuellement.'); }
+  } catch (_) { alert('Clipboard refusé.'); }
 });
 
 document.getElementById('btn-apply').addEventListener('click', () => {
   try {
     const data = JSON.parse(document.getElementById('json').value);
-    if (data.floor) state.floor = { ...state.floor, ...data.floor };
-    state.walls = Array.isArray(data.walls) ? data.walls : [];
-    state.paintings = Array.isArray(data.paintings) ? data.paintings : [];
-    if (data.spawn) state.spawn = { ...state.spawn, ...data.spawn };
-    if (typeof data.gridSize === 'number') { state.grid = data.gridSize; document.getElementById('grid').value = data.gridSize; }
-    document.getElementById('floor-w').value = state.floor.width;
-    document.getElementById('floor-d').value = state.floor.depth;
-    document.getElementById('wall-h').value = state.floor.wallHeight;
+    applyDataToState(data);
+    syncUIFromState();
     state.selected = null;
     updateSelectionBox();
     draw();
@@ -645,7 +812,10 @@ document.getElementById('btn-download').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
-// Sélection — panneau édition
+// ============================================================================
+// SELECTION PANEL
+// ============================================================================
+
 function updateSelectionBox() {
   const box = document.getElementById('selection-box');
   box.innerHTML = '';
@@ -668,7 +838,7 @@ function updateSelectionBox() {
     row.appendChild(inp);
     box.appendChild(row);
   }
-  function select(label, value, options, onchange) {
+  function selectField(label, value, options, onchange) {
     const row = document.createElement('div'); row.className = 'row';
     const l = document.createElement('label'); l.textContent = label; row.appendChild(l);
     const sel = document.createElement('select');
@@ -681,6 +851,15 @@ function updateSelectionBox() {
     row.appendChild(sel);
     box.appendChild(row);
   }
+  function toggleField(label, value, onchange) {
+    const row = document.createElement('label'); row.className = 'toggle-row';
+    const inp = document.createElement('input');
+    inp.type = 'checkbox'; inp.checked = !!value;
+    inp.addEventListener('change', (e) => { onchange(e.target.checked); exportJson(); draw(); });
+    const lab = document.createElement('span'); lab.style.flex = '1'; lab.textContent = label;
+    row.appendChild(inp); row.appendChild(lab);
+    box.appendChild(row);
+  }
 
   if (s.type === 'wall') {
     const w = state.walls[s.index];
@@ -688,11 +867,12 @@ function updateSelectionBox() {
     field('Z1', w.z1, v => w.z1 = +v || 0, { type: 'number' });
     field('X2', w.x2, v => w.x2 = +v || 0, { type: 'number' });
     field('Z2', w.z2, v => w.z2 = +v || 0, { type: 'number' });
+    toggleField('Mur visible (sinon collision uniquement)', w.visible !== false, v => w.visible = v);
   } else if (s.type === 'painting') {
     const p = state.paintings[s.index];
     field('ID', p.id, v => p.id = v);
     field('Label', p.label, v => p.label = v);
-    select('Mode', p.mode, ['marathon', 'sprint40', 'zen'], v => p.mode = v);
+    selectField('Mode', p.mode, ['marathon', 'sprint40', 'zen'], v => p.mode = v);
     field('X', p.x, v => p.x = +v || 0, { type: 'number' });
     field('Z', p.z, v => p.z = +v || 0, { type: 'number' });
     field('Rotation Y (deg)', p.rotationY ?? 0, v => p.rotationY = +v || 0, { type: 'number', step: 45 });
@@ -704,42 +884,121 @@ function updateSelectionBox() {
 }
 
 // ============================================================================
-// EXPORT / INIT
+// EXPORT / IMPORT / STORAGE
 // ============================================================================
 
 function exportJson() {
   const data = {
-    version: 1,
+    version: 2,
     name: 'Hub',
     gridSize: state.grid,
-    floor: state.floor,
-    walls: state.walls,
+    floor: { ...state.floor },
+    ceiling: { ...state.ceiling },
+    decorations: { ...state.decorations },
+    walls: state.walls.map(w => ({ ...w, visible: w.visible !== false })),
     paintings: state.paintings,
     spawn: state.spawn,
   };
   document.getElementById('json').value = JSON.stringify(data, null, 2);
 }
 
-// Map de démo au boot : salle rectangulaire simple + 3 tableaux
+function applyDataToState(data) {
+  if (data.floor) {
+    state.floor = {
+      width: data.floor.width ?? 1600,
+      depth: data.floor.depth ?? 2000,
+      wallHeight: data.floor.wallHeight ?? 800,
+      visible: data.floor.visible !== false,
+      pattern: data.floor.pattern ?? 'checker',
+    };
+  }
+  if (data.ceiling) state.ceiling = { visible: data.ceiling.visible !== false };
+  if (data.decorations) {
+    state.decorations = {
+      pillars: !!data.decorations.pillars,
+      centerCarpet: !!data.decorations.centerCarpet,
+      entryRug: !!data.decorations.entryRug,
+    };
+  }
+  state.walls = Array.isArray(data.walls)
+    ? data.walls.map(w => ({ x1: w.x1, z1: w.z1, x2: w.x2, z2: w.z2, visible: w.visible !== false }))
+    : [];
+  state.paintings = Array.isArray(data.paintings) ? data.paintings : [];
+  if (data.spawn) state.spawn = { ...state.spawn, ...data.spawn };
+  if (typeof data.gridSize === 'number') state.grid = data.gridSize;
+}
+
+function syncUIFromState() {
+  document.getElementById('floor-w').value = state.floor.width;
+  document.getElementById('floor-d').value = state.floor.depth;
+  document.getElementById('wall-h').value = state.floor.wallHeight;
+  document.getElementById('env-floor').checked = state.floor.visible !== false;
+  document.getElementById('floor-pattern').value = state.floor.pattern;
+  document.getElementById('env-ceiling').checked = state.ceiling.visible !== false;
+  document.getElementById('deco-pillars').checked = !!state.decorations.pillars;
+  document.getElementById('deco-carpet').checked = !!state.decorations.centerCarpet;
+  document.getElementById('deco-entry-rug').checked = !!state.decorations.entryRug;
+  document.getElementById('grid').value = state.grid;
+}
+
+const STORAGE_KEY = 'tetris64.hubMap';
+
+function applyToGame() {
+  try {
+    const data = JSON.parse(document.getElementById('json').value);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(STORAGE_KEY + '.updatedAt', String(Date.now()));
+    showStatus('✓ Map appliquée. Recharge l\'onglet du jeu.', 'ok');
+  } catch (e) {
+    showStatus('JSON invalide : ' + e.message, 'err');
+  }
+}
+
+function clearGameMap() {
+  if (!confirm('Supprimer la map sauvegardée ? Le jeu reviendra aux défauts.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE_KEY + '.updatedAt');
+  showStatus('Map effacée du jeu.', 'ok');
+}
+
+function showStatus(msg, kind = 'ok') {
+  const s = document.getElementById('storage-status');
+  if (!s) return;
+  s.textContent = msg;
+  s.style.color = kind === 'ok' ? 'var(--ok)' : 'var(--danger)';
+  setTimeout(() => { if (s.textContent === msg) s.textContent = ''; }, 4000);
+}
+
+document.getElementById('btn-apply-game').addEventListener('click', applyToGame);
+document.getElementById('btn-clear-storage').addEventListener('click', clearGameMap);
+
+// ============================================================================
+// BOOT
+// ============================================================================
+
 function loadDemo() {
   const W = state.floor.width, D = state.floor.depth;
   state.walls = [
-    { x1: -W/2, z1: -D/2, x2:  W/2, z2: -D/2 },  // mur arrière
-    { x1:  W/2, z1: -D/2, x2:  W/2, z2:  D/2 },  // mur droit
-    { x1:  W/2, z1:  D/2, x2: -W/2, z2:  D/2 },  // mur avant
-    { x1: -W/2, z1:  D/2, x2: -W/2, z2: -D/2 },  // mur gauche
+    { x1: -W/2, z1: -D/2, x2:  W/2, z2: -D/2, visible: true },
+    { x1:  W/2, z1: -D/2, x2:  W/2, z2:  D/2, visible: true },
+    { x1:  W/2, z1:  D/2, x2: -W/2, z2:  D/2, visible: true },
+    { x1: -W/2, z1:  D/2, x2: -W/2, z2: -D/2, visible: true },
   ];
   state.paintings = [
-    { id: 'marathon', label: 'MARATHON', mode: 'marathon', x: -400, z: -950 + 20, rotationY: 0 },
-    { id: 'sprint40', label: 'SPRINT 40L', mode: 'sprint40', x: 0, z: -950 + 20, rotationY: 0 },
-    { id: 'zen', label: 'ZEN', mode: 'zen', x: 400, z: -950 + 20, rotationY: 0 },
+    { id: 'marathon', label: 'MARATHON', mode: 'marathon', x: -400, z: -930, rotationY: 0 },
+    { id: 'sprint40', label: 'SPRINT 40L', mode: 'sprint40', x: 0, z: -930, rotationY: 0 },
+    { id: 'zen', label: 'ZEN', mode: 'zen', x: 400, z: -930, rotationY: 0 },
   ];
   state.spawn = { x: 0, z: 400, angle: 180 };
 }
 
 loadDemo();
-resize();
+syncUIFromState();
 exportJson();
+
+requestAnimationFrame(() => {
+  resize();
+});
 </script>
 </body>
 </html>

@@ -86,13 +86,16 @@ export function createHubMap(options) {
   // -------------------------------------------------------------------
   // SOL (damier + tapis)
   // -------------------------------------------------------------------
-
+  if (mapData?.floor?.visible !== false) {
   const floor = el('div', { class: 'hub-map__floor' });
   floor.style.width = `${width}px`;
   floor.style.height = `${depth}px`;
   floor.style.transform =
     `translate3d(${-width / 2}px, 0px, ${-depth / 2}px) rotateX(90deg)`;
   root.appendChild(floor);
+  }
+
+  if (deco.centerCarpet) {
 
   // Tapis rouge central
   const carpetW = Math.round(width * 0.3);
@@ -103,10 +106,11 @@ export function createHubMap(options) {
   carpet.style.transform =
     `translate3d(${-carpetW / 2}px, -1px, ${-carpetD / 2}px) rotateX(90deg)`;
   root.appendChild(carpet);
-
+  }
   // -------------------------------------------------------------------
   // PLAFOND
   // -------------------------------------------------------------------
+  if (mapData?.ceiling?.visible !== false) {
 
   const ceiling = el('div', { class: 'hub-map__ceiling' });
   ceiling.style.width = `${width}px`;
@@ -114,35 +118,18 @@ export function createHubMap(options) {
   ceiling.style.transform =
     `translate3d(${-width / 2}px, ${-wallHeight}px, ${-depth / 2}px) rotateX(-90deg)`;
   root.appendChild(ceiling);
-
+  }
   // -------------------------------------------------------------------
   // MURS — générés depuis mapData.walls ou par défaut
   // -------------------------------------------------------------------
 
+  
   const wallsData = (mapData?.walls && mapData.walls.length > 0)
     ? mapData.walls
     : defaultRectangleWalls(width, depth);
 
   wallsData.forEach((seg) => buildWallSegment(root, seg, wallHeight));
 
-  // -------------------------------------------------------------------
-  // DÉCORS : 4 piliers aux coins + petit tapis d'entrée
-  // -------------------------------------------------------------------
-
-  const pillarInset = 200;
-  /** @type {Array<{x:number, z:number}>} */
-  const pillarPositions = [
-    { x: -width / 2 + pillarInset, z: -depth / 2 + pillarInset },
-    { x:  width / 2 - pillarInset, z: -depth / 2 + pillarInset },
-    { x: -width / 2 + pillarInset, z:  depth / 2 - pillarInset },
-    { x:  width / 2 - pillarInset, z:  depth / 2 - pillarInset },
-  ];
-  pillarPositions.forEach((p) => {
-    const pillar = el('div', { class: 'hub-map__pillar' });
-    pillar.style.height = `${wallHeight}px`;
-    pillar.style.transform = `translate3d(${p.x - 30}px, ${-wallHeight}px, ${p.z}px)`;
-    root.appendChild(pillar);
-  });
 
   const entryRug = el('div', { class: 'hub-map__entry-rug' });
   entryRug.style.transform =

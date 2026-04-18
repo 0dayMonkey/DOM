@@ -133,6 +133,9 @@ export function createHubScene() {
       maxSpeedExtraDist: 0,
       bounds: camBounds,
       maxYawOffsetDeg: 45,
+      walls: map.getWalls(),   // ← LA LIGNE CRITIQUE
+      wallPadding: 40,
+      minDistanceToPlayer: 150,
     });
     follow.enable();
 
@@ -321,24 +324,42 @@ export function createHubScene() {
 // ============================================================================
 
 /**
- * Tente de charger le JSON de map depuis plusieurs chemins candidats.
- * Retourne null si aucun ne répond : on bascule sur la salle par défaut.
+ * Charge la map : priorité à localStorage (éditée par /mapcreator/),
+ * puis fetch du fichier JSON statique, puis null (→ défauts).
  *
  * @returns {Promise<import('../hub/hubMap.js').MapData | null>}
  */
 async function loadMapData() {
+  // 1) localStorage (source live depuis l'éditeur)
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('tetris64.hubMap');
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data && typeof data === 'object') {
+          console.log('[hubScene] Map chargée depuis localStorage');
+          return data;
+        }
+      }
+    } catch (_) { /* ignore, on essaie le fetch */ }
+  }
+
+  // 2) Fallback : fichier JSON statique
   if (typeof fetch === 'undefined') return null;
   for (const url of MAP_URLS) {
     try {
       const res = await fetch(url, { cache: 'no-cache' });
       if (res.ok) {
         const data = await res.json();
-        if (data && typeof data === 'object') return data;
+        if (data && typeof data === 'object') {
+          console.log('[hubScene] Map chargée depuis', url);
+          return data;
+        }
       }
-    } catch (_) {
-      /* on essaie le suivant */
-    }
+    } catch (_) { /* on essaie le suivant */ }
   }
+
+  console.log('[hubScene] Aucune map trouvée, utilisation des défauts');
   return null;
 }
 
