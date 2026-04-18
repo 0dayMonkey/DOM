@@ -338,7 +338,7 @@ export function createFollowCamera(options) {
     snapToTarget,
     destroy,
     isEnabled: () => enabled,
-
+    // Tweaking
     setBaseDistance,
     setBaseHeight,
     setLookAhead,

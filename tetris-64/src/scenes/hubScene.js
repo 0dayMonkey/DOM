@@ -1,22 +1,16 @@
 /**
  * hubScene.js — Scène hub (château/galerie).
  *
- * Espace 3D central façon Mario 64 :
- *  - Salle avec sol, tapis, murs, plafond, ambiance pastel.
- *  - 3 tableaux sur le mur arrière : MARATHON, SPRINT 40L, ZEN.
- *  - Un personnage déplaçable au clavier.
- *  - Une caméra tierce personne qui suit le joueur.
+ * Utilise une followCamera GTA V–like (voir ../hub/followCamera.js).
  *
  * CONVENTION
- *   Le joueur spawn à z = +400 et regarde vers -Z (vers le mur arrière
- *   où sont les tableaux). Le player a donc angle = π au spawn.
- *   Les tableaux sont placés au fond (z ≈ -950) SANS ROTATION :
- *   leur face naturelle pointe vers +Z, donc face au joueur qui vient de +Z.
+ *   Le joueur spawn à z = +400 et regarde vers -Z (angle=π). Les tableaux
+ *   sont au fond (z ≈ -950), sans rotation : face naturelle vers +Z,
+ *   donc face au joueur.
  *
  * DEBUG
  *   Pendant la scène hub, la follow camera est exposée sur
- *   `window.__TETRIS64__.hub` pour permettre de la tweaker en live depuis
- *   la console. Voir le bas du fichier pour l'API.
+ *   `window.__TETRIS64__.hub`. Voir le bas du fichier pour l'API.
  */
 
 import { SCENES, ACTIONS, GAME_MODES } from '../core/constants.js';
@@ -59,20 +53,16 @@ export function createHubScene() {
     ctx = context;
     ctx.input.actionMap.pushContext('hub');
 
-    // Ambiance
     ctx.effects.resetTilt(0);
     ctx.fog.applyPreset('hub');
     ctx.skybox.fade(0.8, 400);
 
-    // Construction DOM
     root = el('div', { class: 'hub-scene' });
     ctx.root.appendChild(root);
 
-    // La salle
     map = createHubMap({ host: root });
     const bounds = map.getBounds();
 
-    // Le personnage — spawn au centre-avant, regardant vers le fond (angle=π).
     player = createHubPlayer({
       host: root,
       actionMap: ctx.input.actionMap,
@@ -82,7 +72,6 @@ export function createHubScene() {
       bounds,
     });
 
-    // Les tableaux — au fond, face au joueur (pas de rotation).
     paintings = createPaintings({
       host: root,
       audio: ctx.audio,
@@ -93,22 +82,31 @@ export function createHubScene() {
       ],
     });
 
-    // Caméra tierce personne — LERPS SÉPARÉS
-    // - lerpPos (0.18) : lissage doux de la position
-    // - lerpRot (0.35) : lissage agressif de l'angle, pour rester dans le dos
+    // Caméra GTA V–like
+    // Bounds caméra un peu plus larges que les bounds joueur pour qu'elle
+    // puisse reculer au-delà des limites de marche sans sortir de la salle.
+    const camBounds = {
+      minX: bounds.minX - 200, maxX: bounds.maxX + 200,
+      minZ: bounds.minZ - 200, maxZ: bounds.maxZ + 200,
+    };
     follow = createFollowCamera({
       camera: ctx.camera,
       target: player,
-      offset: { x: 0, y: -240, z: 480 },
-      lerpPos: 0.18,
-      lerpRot: 0.35,
+      baseDistance: 480,
+      baseHeight: -240,
+      lookAheadDistance: 400,
+      deadzoneRadius: 30,
+      lerpPosXZ: 0.12,
+      lerpPosY: 0.18,
+      lerpRot: 0.04,       // ← TRÈS lent, effet GTA signature
       tiltDeg: 20,
+      speedDistanceFactor: 0.3,
+      speedHeightFactor: 0.15,
+      maxSpeedExtraDist: 120,
+      bounds: camBounds,
     });
-
-    follow.snapToTarget();
     follow.enable();
 
-    // Prompt "APPUYEZ SUR ENTRÉE" contextuel
     interactPromptEl = el(
       'div',
       { class: 'hub__interact-prompt is-hidden' },
@@ -119,7 +117,6 @@ export function createHubScene() {
 
     ctx.audio.playMusic(ctx.audio.MUSIC.HUB, { fadeInMs: 800 });
 
-    // Interactions
     unsubs.push(
       ctx.input.actionMap.on(ACTIONS.INTERACT,  (e) => { if (e.phase === 'down') tryEnterPainting(); }),
       ctx.input.actionMap.on(ACTIONS.START,     (e) => { if (e.phase === 'down') tryEnterPainting(); }),
@@ -127,7 +124,6 @@ export function createHubScene() {
       ctx.input.actionMap.on(ACTIONS.BACK,      (e) => { if (e.phase === 'down') goBackToTitle(); }),
     );
 
-    // Expose pour le debug console
     exposeDebug();
   }
 
@@ -210,7 +206,7 @@ export function createHubScene() {
   }
 
   // ---------------------------------------------------------------------
-  // DEBUG — expose les objets de la scène sur window pour tweaking live
+  // DEBUG — exposé sur window.__TETRIS64__.hub
   // ---------------------------------------------------------------------
 
   function exposeDebug() {
@@ -222,15 +218,24 @@ export function createHubScene() {
       player,
       paintings,
       map,
-      // Helpers raccourcis
-      camPos: (y, z) => follow && follow.setOffset({ y, z }),
-      camTilt: (deg) => follow && follow.setTilt(deg),
-      camLerp: (pos, rot) => follow && follow.setLerp({ pos, rot }),
+
+      // Raccourcis tweaking
+      dist: (d) => follow && follow.setBaseDistance(d),
+      height: (h) => follow && follow.setBaseHeight(h),
+      lookAhead: (d) => follow && follow.setLookAhead(d),
+      deadzone: (r) => follow && follow.setDeadzone(r),
+      tilt: (deg) => follow && follow.setTilt(deg),
+      lerp: (posXZ, posY, rot) => follow && follow.setLerp({ posXZ, posY, rot }),
+      speed: (dist, height, max) => follow && follow.setSpeedEffect({
+        distFactor: dist, heightFactor: height, maxExtraDist: max,
+      }),
+
+      // Téléport du joueur
       tpPlayer: (x, y, z) => player && player.setPosition({ x, y, z }),
+
+      // Status complet
       status: () => ({
-        offset: follow?.getOffset(),
-        tilt:   follow?.getTilt(),
-        lerp:   follow?.getLerp(),
+        camera: follow?.getStatus(),
         player: player?.getPosition(),
         angle:  player?.getAngle(),
       }),
