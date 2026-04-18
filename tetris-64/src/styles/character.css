@@ -4,6 +4,8 @@
  * Le joueur est un petit personnage stylisé N64 composé de 2 cubes empilés :
  *   - un CORPS carré au sol (couleur rouge N64 par défaut)
  *   - une TÊTE posée dessus (plus petite, crème avec deux yeux)
+ *   - des CHEVEUX (4 mèches animées physiquement, lisent des CSS vars
+ *     pilotées par player.js pour simuler l'inertie)
  *   - une OMBRE ovale au sol (non-3D, posée à plat)
  *
  * Les deux cubes sont de vrais cubes CSS 3D (6 faces) pour qu'ils réagissent
@@ -15,213 +17,363 @@
  */
 
  .hub-player {
-    position: absolute;
-    top: 0;
-    left: 0;
-    transform-style: preserve-3d;
-    will-change: transform;
-    pointer-events: none;
-    /* Dimensions logiques (hors scale) : corps ≈ 80px cube, tête ≈ 60px cube */
-    --char-body-size: 80px;
-    --char-head-size: 60px;
-    --char-body-color: var(--n64-red, #E60012);
-    --char-head-color: #FFE8C8;
-    --char-eye-color: var(--outline-dark, #1A1A2E);
-  }
-  
-  /* ==========================================================================
-     OMBRE AU SOL
-     ========================================================================== */
-  
-  .hub-player__shadow {
-    position: absolute;
-    top: -2px;
-    left: -60px;
-    width: 120px;
-    height: 40px;
-    background: radial-gradient(
-      ellipse at center,
-      rgba(0, 0, 0, 0.55) 0%,
-      rgba(0, 0, 0, 0.2) 55%,
-      transparent 100%
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+  pointer-events: none;
+  /* Dimensions logiques (hors scale) : corps ≈ 80px cube, tête ≈ 60px cube */
+  --char-body-size: 80px;
+  --char-head-size: 60px;
+  --char-body-color: var(--n64-red, #E60012);
+  --char-head-color: #FFE8C8;
+  --char-eye-color: var(--outline-dark, #1A1A2E);
+}
+
+/* ==========================================================================
+   OMBRE AU SOL
+   ========================================================================== */
+
+.hub-player__shadow {
+  position: absolute;
+  top: -2px;
+  left: -60px;
+  width: 120px;
+  height: 40px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.55) 0%,
+    rgba(0, 0, 0, 0.2) 55%,
+    transparent 100%
+  );
+  transform: rotateX(90deg);
+  transform-origin: 50% 50%;
+  filter: blur(2px);
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   CORPS + TÊTE — wrappers
+   ========================================================================== */
+
+.hub-player__body-wrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.hub-player__body,
+.hub-player__head {
+  position: absolute;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.hub-player__body {
+  width: var(--char-body-size);
+  height: var(--char-body-size);
+  /* Le corps est centré horizontalement sur (0,0) et son bas posé au sol. */
+  top: calc(var(--char-body-size) * -1);
+  left: calc(var(--char-body-size) / -2);
+}
+
+.hub-player__head {
+  width: var(--char-head-size);
+  height: var(--char-head-size);
+  /* La tête est juste au-dessus du corps, centrée horizontalement. */
+  top: calc((var(--char-body-size) + var(--char-head-size)) * -1 + 2px);
+  left: calc(var(--char-head-size) / -2);
+}
+
+/* ==========================================================================
+   FACES — 6 par cube
+   ========================================================================== */
+
+.hub-player__face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: var(--outline-width, 2px) solid var(--outline-dark, #1A1A2E);
+  box-sizing: border-box;
+  backface-visibility: hidden;
+}
+
+/* Corps */
+.hub-player__body .hub-player__face {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--char-body-color) 100%, white 15%) 0%,
+      var(--char-body-color) 60%,
+      color-mix(in srgb, var(--char-body-color) 80%, black 20%) 100%
     );
-    transform: rotateX(90deg);
-    transform-origin: 50% 50%;
-    filter: blur(2px);
-    pointer-events: none;
+}
+.hub-player__body .hub-player__face--front  { transform: translate3d(0, 0, calc(var(--char-body-size) / 2)); }
+.hub-player__body .hub-player__face--back   { transform: translate3d(0, 0, calc(var(--char-body-size) / -2)) rotateY(180deg); }
+.hub-player__body .hub-player__face--left   { transform: translate3d(calc(var(--char-body-size) / -2), 0, 0) rotateY(-90deg); width: var(--char-body-size); }
+.hub-player__body .hub-player__face--right  { transform: translate3d(calc(var(--char-body-size) / 2), 0, 0) rotateY(90deg);  width: var(--char-body-size); }
+.hub-player__body .hub-player__face--top    { transform: translate3d(0, calc(var(--char-body-size) / -2), 0) rotateX(90deg);
+                                               background: linear-gradient(180deg, color-mix(in srgb, var(--char-body-color) 100%, white 30%) 0%, var(--char-body-color) 100%); }
+.hub-player__body .hub-player__face--bottom { transform: translate3d(0, calc(var(--char-body-size) / 2), 0) rotateX(-90deg);
+                                               background: color-mix(in srgb, var(--char-body-color) 50%, black 50%); }
+
+/* Tête */
+.hub-player__head .hub-player__face {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--char-head-color) 100%, white 15%) 0%,
+      var(--char-head-color) 60%,
+      color-mix(in srgb, var(--char-head-color) 80%, black 15%) 100%
+    );
+}
+.hub-player__head .hub-player__face--front  { transform: translate3d(0, 0, calc(var(--char-head-size) / 2)); }
+.hub-player__head .hub-player__face--back   { transform: translate3d(0, 0, calc(var(--char-head-size) / -2)) rotateY(180deg); }
+.hub-player__head .hub-player__face--left   { transform: translate3d(calc(var(--char-head-size) / -2), 0, 0) rotateY(-90deg); width: var(--char-head-size); }
+.hub-player__head .hub-player__face--right  { transform: translate3d(calc(var(--char-head-size) / 2), 0, 0) rotateY(90deg);  width: var(--char-head-size); }
+.hub-player__head .hub-player__face--top    { transform: translate3d(0, calc(var(--char-head-size) / -2), 0) rotateX(90deg);
+                                               background: linear-gradient(180deg, color-mix(in srgb, var(--char-head-color) 100%, white 30%) 0%, var(--char-head-color) 100%); }
+.hub-player__head .hub-player__face--bottom { transform: translate3d(0, calc(var(--char-head-size) / 2), 0) rotateX(-90deg);
+                                               background: color-mix(in srgb, var(--char-head-color) 50%, black 50%); }
+
+/* ==========================================================================
+   YEUX (collés sur la face avant de la tête)
+   ========================================================================== */
+
+.hub-player__eyes {
+  position: absolute;
+  top: 40%;
+  left: 18%;
+  right: 18%;
+  display: flex;
+  justify-content: space-between;
+  /* Se colle devant la face --front */
+  transform: translate3d(0, 0, calc(var(--char-head-size) / -2 + 0.5px));
+  pointer-events: none;
+}
+
+.hub-player__eye {
+  width: 8px;
+  height: 10px;
+  background: var(--char-eye-color);
+  border-radius: 2px;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
+  animation: player-blink 5s infinite;
+  transform-origin: center center;
+}
+
+/* Décalage de l'œil droit pour que le clignement ne soit pas synchronisé
+   à 100% (petit effet d'asymétrie, détail N64) */
+.hub-player__eye--right {
+  animation-delay: 0.1s;
+}
+
+@keyframes player-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  94%           { transform: scaleY(0.1); }
+  96%           { transform: scaleY(1); }
+}
+
+/* ==========================================================================
+   CHEVEUX — mèches physiques attachées au sommet de la tête
+   ==========================================================================
+
+   Structure DOM (créée dans player.js) :
+     .hub-player__hair                   ← conteneur posé sur la tête
+       .hub-player__hair-strand--front   ← frange (grosse mèche frontale)
+       .hub-player__hair-strand--left
+       .hub-player__hair-strand--right
+       .hub-player__hair-strand--back    ← mèche arrière (la plus réactive)
+         .hub-player__hair-strand-inner  ← visuel (couleur, shape)
+
+   PHYSIQUE : player.js écrit sur .hub-player__hair 4 variables CSS à
+   chaque frame, selon la vitesse et la rotation du joueur :
+
+     --hair-lag-x   (px)   : retard latéral (opposé à la vitesse "side")
+     --hair-lag-z   (px)   : retard avant/arrière (opposé au forward)
+     --hair-sway    (deg)  : rotation d'oscillation (basée sur vitesse ang.)
+     --hair-bounce  (px)   : bounce vertical (sinus de la phase de marche)
+
+   Chaque mèche consomme ces variables avec un facteur qui dépend de sa
+   position : la mèche arrière réagit 1.2× plus fort que la frange avant
+   (0.6×), pour créer un effet de vague. Tout est exprimé en calc() dans
+   la propriété transform directement.
+   ========================================================================== */
+
+.hub-player__hair {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  /* Posée sur le dessus de la tête. */
+  transform: translate3d(
+    0,
+    calc((var(--char-body-size) + var(--char-head-size)) * -1.1),
+    0
+  );
+  transform-style: preserve-3d;
+  pointer-events: none;
+  /* Valeurs par défaut ; player.js les met à jour à chaque frame */
+  --hair-lag-x: 0px;
+  --hair-lag-z: 0px;
+  --hair-sway: 0deg;
+  --hair-bounce: 0px;
+  --hair-color: #3A1F10;
+}
+
+.hub-player__hair-strand {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* Chaque mèche pivote à partir de la racine (top: 0) = sommet du crâne. */
+  transform-origin: 50% 0%;
+  transform-style: preserve-3d;
+  will-change: transform;
+  /* Transition courte pour lisser les micro-oscillations (complémentaire
+     du lerp JS) — pas trop longue sinon le mouvement paraît flottant. */
+  transition: transform 70ms linear;
+}
+
+.hub-player__hair-strand-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 18px;
+  height: 34px;
+  margin-left: -9px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--hair-color, #3A1F10) 100%, white 20%) 0%,
+      var(--hair-color, #3A1F10) 55%,
+      color-mix(in srgb, var(--hair-color, #3A1F10) 70%, black 30%) 100%
+    );
+  border: var(--outline-width, 2px) solid var(--outline-dark, #1A1A2E);
+  border-radius: 40% 40% 60% 60% / 30% 30% 80% 80%;
+  box-sizing: border-box;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.2),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* Frange avant — plus large et plus courte, effet "coiffé en avant" */
+.hub-player__hair-strand--front {
+  transform: translate3d(
+    calc(var(--hair-lag-x) * 0.6),
+    var(--hair-bounce),
+    calc(12px + var(--hair-lag-z) * 0.3)
+  ) rotateX(calc(var(--hair-sway) * -0.3))
+    rotateZ(calc(var(--hair-sway) * 0.5));
+}
+.hub-player__hair-strand--front .hub-player__hair-strand-inner {
+  width: 30px;
+  height: 22px;
+  margin-left: -15px;
+  border-radius: 50% 50% 40% 40%;
+}
+
+/* Mèche côté gauche */
+.hub-player__hair-strand--left {
+  transform: translate3d(
+    calc(-16px + var(--hair-lag-x) * 0.9),
+    var(--hair-bounce),
+    calc(2px + var(--hair-lag-z) * 0.5)
+  ) rotateY(-20deg)
+    rotateZ(calc(-10deg + var(--hair-sway) * 0.7));
+}
+
+/* Mèche côté droit */
+.hub-player__hair-strand--right {
+  transform: translate3d(
+    calc(16px + var(--hair-lag-x) * 0.9),
+    var(--hair-bounce),
+    calc(2px + var(--hair-lag-z) * 0.5)
+  ) rotateY(20deg)
+    rotateZ(calc(10deg + var(--hair-sway) * 0.7));
+}
+
+/* Mèche arrière — la plus réactive (inertie 1.2×). */
+.hub-player__hair-strand--back {
+  transform: translate3d(
+    calc(var(--hair-lag-x) * 1.2),
+    calc(var(--hair-bounce) * 1.3),
+    calc(-14px + var(--hair-lag-z) * 1.1)
+  ) rotateZ(calc(var(--hair-sway) * 1.0))
+    rotateX(calc(var(--hair-sway) * 0.4));
+}
+.hub-player__hair-strand--back .hub-player__hair-strand-inner {
+  width: 22px;
+  height: 40px;
+  margin-left: -11px;
+}
+
+/* ==========================================================================
+   Idle / walk animations
+   ========================================================================== */
+
+@keyframes player-idle {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50%      { transform: translate3d(0, -4px, 0); }
+}
+
+/* Quand le joueur bouge activement, le JS applique cette classe : on arrête
+   l'animation idle (le bob est calculé en JS pour rester synchro avec les
+   footsteps). */
+.hub-player.is-walking .hub-player__body-wrap {
+  animation: none;
+}
+
+/* Spawn : petit "pop" quand le joueur apparaît dans le hub */
+.hub-player--spawn-in {
+  animation: player-spawn-in 0.45s var(--ease-bounce) both;
+}
+
+@keyframes player-spawn-in {
+  0%   { transform: scale(0)    translateY(40px); opacity: 0; }
+  70%  { transform: scale(1.15) translateY(0);    opacity: 1; }
+  100% { transform: scale(1)    translateY(0);    opacity: 1; }
+}
+
+/* ==========================================================================
+   Responsive — on réduit la taille du personnage sur mobile
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .hub-player {
+    --char-body-size: 64px;
+    --char-head-size: 48px;
   }
-  
-  /* ==========================================================================
-     CORPS + TÊTE — wrappers
-     ========================================================================== */
-  
-  .hub-player__body-wrap {
-    position: absolute;
-    top: 0;
-    left: 0;
-    transform-style: preserve-3d;
-    will-change: transform;
+  .hub-player__shadow {
+    width: 100px;
+    height: 32px;
+    left: -50px;
   }
-  
-  .hub-player__body,
-  .hub-player__head {
-    position: absolute;
-    transform-style: preserve-3d;
-    will-change: transform;
+  .hub-player__hair-strand-inner {
+    width: 14px;
+    height: 26px;
+    margin-left: -7px;
   }
-  
-  .hub-player__body {
-    width: var(--char-body-size);
-    height: var(--char-body-size);
-    /* Le corps est centré horizontalement sur (0,0) et son bas posé au sol. */
-    top: calc(var(--char-body-size) * -1);
-    left: calc(var(--char-body-size) / -2);
+  .hub-player__hair-strand--front .hub-player__hair-strand-inner {
+    width: 22px;
+    height: 16px;
+    margin-left: -11px;
   }
-  
-  .hub-player__head {
-    width: var(--char-head-size);
-    height: var(--char-head-size);
-    /* La tête est juste au-dessus du corps, centrée horizontalement. */
-    top: calc((var(--char-body-size) + var(--char-head-size)) * -1 + 2px);
-    left: calc(var(--char-head-size) / -2);
+  .hub-player__hair-strand--back .hub-player__hair-strand-inner {
+    width: 16px;
+    height: 30px;
+    margin-left: -8px;
   }
-  
-  /* ==========================================================================
-     FACES — 6 par cube
-     ========================================================================== */
-  
-  .hub-player__face {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    border: var(--outline-width, 2px) solid var(--outline-dark, #1A1A2E);
-    box-sizing: border-box;
-    backface-visibility: hidden;
-  }
-  
-  /* Corps */
-  .hub-player__body .hub-player__face {
-    background:
-      linear-gradient(
-        135deg,
-        color-mix(in srgb, var(--char-body-color) 100%, white 15%) 0%,
-        var(--char-body-color) 60%,
-        color-mix(in srgb, var(--char-body-color) 80%, black 20%) 100%
-      );
-  }
-  .hub-player__body .hub-player__face--front  { transform: translate3d(0, 0, calc(var(--char-body-size) / 2)); }
-  .hub-player__body .hub-player__face--back   { transform: translate3d(0, 0, calc(var(--char-body-size) / -2)) rotateY(180deg); }
-  .hub-player__body .hub-player__face--left   { transform: translate3d(calc(var(--char-body-size) / -2), 0, 0) rotateY(-90deg); width: var(--char-body-size); }
-  .hub-player__body .hub-player__face--right  { transform: translate3d(calc(var(--char-body-size) / 2), 0, 0) rotateY(90deg);  width: var(--char-body-size); }
-  .hub-player__body .hub-player__face--top    { transform: translate3d(0, calc(var(--char-body-size) / -2), 0) rotateX(90deg);
-                                                 background: linear-gradient(180deg, color-mix(in srgb, var(--char-body-color) 100%, white 30%) 0%, var(--char-body-color) 100%); }
-  .hub-player__body .hub-player__face--bottom { transform: translate3d(0, calc(var(--char-body-size) / 2), 0) rotateX(-90deg);
-                                                 background: color-mix(in srgb, var(--char-body-color) 50%, black 50%); }
-  
-  /* Tête */
-  .hub-player__head .hub-player__face {
-    background:
-      linear-gradient(
-        135deg,
-        color-mix(in srgb, var(--char-head-color) 100%, white 15%) 0%,
-        var(--char-head-color) 60%,
-        color-mix(in srgb, var(--char-head-color) 80%, black 15%) 100%
-      );
-  }
-  .hub-player__head .hub-player__face--front  { transform: translate3d(0, 0, calc(var(--char-head-size) / 2)); }
-  .hub-player__head .hub-player__face--back   { transform: translate3d(0, 0, calc(var(--char-head-size) / -2)) rotateY(180deg); }
-  .hub-player__head .hub-player__face--left   { transform: translate3d(calc(var(--char-head-size) / -2), 0, 0) rotateY(-90deg); width: var(--char-head-size); }
-  .hub-player__head .hub-player__face--right  { transform: translate3d(calc(var(--char-head-size) / 2), 0, 0) rotateY(90deg);  width: var(--char-head-size); }
-  .hub-player__head .hub-player__face--top    { transform: translate3d(0, calc(var(--char-head-size) / -2), 0) rotateX(90deg);
-                                                 background: linear-gradient(180deg, color-mix(in srgb, var(--char-head-color) 100%, white 30%) 0%, var(--char-head-color) 100%); }
-  .hub-player__head .hub-player__face--bottom { transform: translate3d(0, calc(var(--char-head-size) / 2), 0) rotateX(-90deg);
-                                                 background: color-mix(in srgb, var(--char-head-color) 50%, black 50%); }
-  
-  /* ==========================================================================
-     YEUX (collés sur la face avant de la tête)
-     ========================================================================== */
-  
-  .hub-player__eyes {
-    position: absolute;
-    top: 40%;
-    left: 18%;
-    right: 18%;
-    display: flex;
-    justify-content: space-between;
-    /* Se colle devant la face --front */
-    transform: translate3d(0, 0, calc(var(--char-head-size) / 2 + 0.5px));
-    pointer-events: none;
-  }
-  
-  .hub-player__eye {
-    width: 8px;
-    height: 10px;
-    background: var(--char-eye-color);
-    border-radius: 2px;
-    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
-    animation: player-blink 5s infinite;
-    transform-origin: center center;
-  }
-  
-  /* Décalage de l'œil droit pour que le clignement ne soit pas synchronisé
-     à 100% (petit effet d'asymétrie, détail N64) */
-  .hub-player__eye--right {
-    animation-delay: 0.1s;
-  }
-  
-  @keyframes player-blink {
-    0%, 92%, 100% { transform: scaleY(1); }
-    94%           { transform: scaleY(0.1); }
-    96%           { transform: scaleY(1); }
-  }
-  
-  /* ==========================================================================
-     Idle / walk animations
-     ========================================================================== */
-  
-  @keyframes player-idle {
-    0%, 100% { transform: translate3d(0, 0, 0); }
-    50%      { transform: translate3d(0, -4px, 0); }
-  }
-  
-  /* Quand le joueur bouge activement, le JS applique cette classe : on arrête
-     l'animation idle (le bob est calculé en JS pour rester synchro avec les
-     footsteps). */
-  .hub-player.is-walking .hub-player__body-wrap {
-    animation: none;
-  }
-  
-  /* Spawn : petit "pop" quand le joueur apparaît dans le hub */
-  .hub-player--spawn-in {
-    animation: player-spawn-in 0.45s var(--ease-bounce) both;
-  }
-  
-  @keyframes player-spawn-in {
-    0%   { transform: scale(0)    translateY(40px); opacity: 0; }
-    70%  { transform: scale(1.15) translateY(0);    opacity: 1; }
-    100% { transform: scale(1)    translateY(0);    opacity: 1; }
-  }
-  
-  /* ==========================================================================
-     Responsive — on réduit la taille du personnage sur mobile
-     ========================================================================== */
-  
-  @media (max-width: 768px) {
-    .hub-player {
-      --char-body-size: 64px;
-      --char-head-size: 48px;
-    }
-    .hub-player__shadow {
-      width: 100px;
-      height: 32px;
-      left: -50px;
-    }
-  }
-  
-  /* Reduced motion : pas d'idle ni de clignement */
-  @media (prefers-reduced-motion: reduce) {
-    .hub-player__body-wrap { animation: none !important; }
-    .hub-player__eye       { animation: none !important; }
-  }
+}
+
+/* Reduced motion : pas d'idle ni de clignement */
+@media (prefers-reduced-motion: reduce) {
+  .hub-player__body-wrap   { animation: none !important; }
+  .hub-player__eye         { animation: none !important; }
+  .hub-player__hair-strand { transition: none !important; }
+}

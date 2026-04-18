@@ -1,29 +1,31 @@
 /**
  * player.js — Personnage contrôlable dans le hub.
  *
- * Un petit "mascotte-cube" composé de :
- *   - un corps (cube principal rouge)
+ * Un "mascotte-cube" composé de :
+ *   - un corps (cube rouge)
  *   - une tête (cube crème avec yeux)
+ *   - des CHEVEUX (4 mèches animées physiquement)
  *   - une ombre plate au sol
  *
  * CONTRÔLES
- *   ← / → : se déplacer gauche / droite (X)
- *   ↑ / ↓ : avancer / reculer (Z)
+ *   ← / → : rotation gauche / droite
+ *   ↑ / ↓ : avancer / reculer selon le forward courant
  *
- * IMPORTANT : dans le keymap par défaut (pensé pour le jeu Tetris), les
- * flèches ↑ et ↓ sont mappées à ACTIONS.ROTATE_CW et ACTIONS.SOFT_DROP.
- * Dans le hub, on veut qu'elles servent à MOVE_UP/MOVE_DOWN. Deux choix :
- *   1) Re-binder le keymap spécifiquement en contexte hub
- *   2) Écouter aussi ROTATE_CW et SOFT_DROP côté player du hub
- * On choisit (2) pour rester non-invasif sur le keymap global.
+ * PHYSIQUE DES CHEVEUX
+ *   Les cheveux simulent une inertie : quand le personnage accélère dans
+ *   une direction, les mèches "traînent" dans la direction opposée. Cela
+ *   se fait en calculant une vitesse lissée puis en l'appliquant comme
+ *   offset sur les variables CSS --hair-lag-x / --hair-lag-z / --hair-sway
+ *   lues par character.css.
+ *
+ *   - Translation : --hair-lag-x, --hair-lag-z en px, opposé à la vitesse
+ *   - Rotation (sway) : basée sur la vitesse angulaire, force de swing
+ *     quand on tourne rapidement
+ *   - Bounce vertical : modulé par la phase de marche (--hair-bounce)
  *
  * Convention d'angle :
- *   - angle = 0 (pas de rotation) → le player "regarde" vers +Z
- *   - rotateY(180°) → regarde vers -Z (fond de la salle, mur arrière)
- *   - forward_player(a) = (sin a, 0, cos a)
- *
- * Le player spawn donc avec angle = π pour regarder vers le mur arrière
- * (où sont accrochés les tableaux) dès l'arrivée dans le hub.
+ *   forward_player(a) = (sin a, 0, cos a)
+ *   angle = π → regarde vers -Z (fond de la salle, tableaux)
  */
 
 import { ACTIONS } from '../core/constants.js';
@@ -36,6 +38,7 @@ import { el } from '../utils/helpers.js';
  * @property {ReturnType<import('../audio/soundManager.js').createSoundManager>} audio
  * @property {ReturnType<import('../fx/particles.js').createParticles>} particles
  * @property {{x:number, y:number, z:number}} [spawn]
+ * @property {number} [initialAngle]
  * @property {import('./hubMap.js').HubBounds} [bounds]
  * @property {number} [speed=280]
  * @property {number} [turnSpeed=3.5]
@@ -58,8 +61,7 @@ export function createHubPlayer(options) {
   let y = options.spawn?.y ?? 0;
   let z = options.spawn?.z ?? 400;
 
-  /** Orientation en radians.
-   *  angle = π → rotateY(180) → regarde vers -Z (fond de la salle). */
+  /** Orientation en radians. angle = π → regarde vers -Z. */
   let angle = options.initialAngle ?? Math.PI;
 
   /** Animations de pas. */
@@ -72,28 +74,58 @@ export function createHubPlayer(options) {
   const unsubs = [];
 
   // ---------------------------------------------------------------------
+  // ÉTAT PHYSIQUE — cheveux
+  // ---------------------------------------------------------------------
+
+  /** Vitesse lissée (px/s) pour l'inertie des cheveux. */
+  let hairVelX = 0;
+  let hairVelZ = 0;
+  /** Vitesse angulaire lissée (rad/s) pour le sway. */
+  let hairAngVel = 0;
+  /** Position précédente pour calculer la vitesse instantanée. */
+  let prevX = x;
+  let prevZ = z;
+  let prevAngle = angle;
+
+  // ---------------------------------------------------------------------
   // DOM
   // ---------------------------------------------------------------------
 
   const root = el('div', { class: 'hub-player' });
   const shadow = el('div', { class: 'hub-player__shadow' });
   const bodyWrap = el('div', { class: 'hub-player__body-wrap' });
+
+  // Corps
   const body = el('div', { class: 'hub-player__body' });
   ['front', 'back', 'left', 'right', 'top', 'bottom'].forEach((f) => {
     body.appendChild(el('div', { class: `hub-player__face hub-player__face--${f}` }));
   });
+
+  // Tête
   const head = el('div', { class: 'hub-player__head' });
   ['front', 'back', 'left', 'right', 'top', 'bottom'].forEach((f) => {
     head.appendChild(el('div', { class: `hub-player__face hub-player__face--${f}` }));
   });
+
+  // Yeux
   const eyes = el('div', { class: 'hub-player__eyes' }, [
     el('div', { class: 'hub-player__eye hub-player__eye--left' }),
     el('div', { class: 'hub-player__eye hub-player__eye--right' }),
   ]);
   head.appendChild(eyes);
 
+  // CHEVEUX — 4 mèches
+  const hair = el('div', { class: 'hub-player__hair' });
+  ['front', 'left', 'right', 'back'].forEach((side) => {
+    const strand = el('div', { class: `hub-player__hair-strand hub-player__hair-strand--${side}` });
+    strand.appendChild(el('div', { class: 'hub-player__hair-strand-inner' }));
+    hair.appendChild(strand);
+  });
+
   bodyWrap.appendChild(body);
   bodyWrap.appendChild(head);
+  // Les cheveux sont solidaires du bodyWrap (tournent avec la tête/corps)
+  bodyWrap.appendChild(hair);
   root.appendChild(shadow);
   root.appendChild(bodyWrap);
   host.appendChild(root);
@@ -104,11 +136,6 @@ export function createHubPlayer(options) {
   // INPUTS
   // ---------------------------------------------------------------------
 
-  /**
-   * Bind une action abstraite à une direction d'input.
-   * @param {string} action
-   * @param {'up'|'down'|'left'|'right'} key
-   */
   function bindInputAction(action, key) {
     unsubs.push(actionMap.on(action, (e) => {
       if (e.phase === 'up') input[key] = 0;
@@ -116,15 +143,10 @@ export function createHubPlayer(options) {
     }));
   }
 
-  // Bindings explicites (WASD-style si re-mappé)
-  bindInputAction(ACTIONS.MOVE_UP,    'up');
-  bindInputAction(ACTIONS.MOVE_DOWN,  'down');
-  bindInputAction(ACTIONS.MOVE_LEFT,  'right');
+  bindInputAction(ACTIONS.MOVE_UP, 'up');
+  bindInputAction(ACTIONS.MOVE_DOWN, 'down');
+  bindInputAction(ACTIONS.MOVE_LEFT, 'right');
   bindInputAction(ACTIONS.MOVE_RIGHT, 'left');
-
-  // Fallback pour les flèches ↑/↓ qui, dans le keymap par défaut, sont
-  // mappées à ROTATE_CW et SOFT_DROP (pour le jeu Tetris). Dans le hub,
-  // on les interprète comme MOVE_UP / MOVE_DOWN.
   bindInputAction(ACTIONS.ROTATE_CW, 'up');
   bindInputAction(ACTIONS.SOFT_DROP, 'down');
 
@@ -138,41 +160,32 @@ export function createHubPlayer(options) {
   function update(dtMs) {
     const dt = dtMs / 1000;
 
-    // Direction désirée dans le plan XZ
-    //   dx > 0 = vers +X (droite)
-    //   dz > 0 = vers +Z (avant de la salle)
-    //   dz < 0 = vers -Z (fond / mur des tableaux)
     const dx = input.right - input.left;
-    const dz = input.down - input.up;  // ArrowDown → +Z, ArrowUp → -Z
-    const turnInput = dx;       // -1 gauche, +1 droite
-    const forwardInput = -dz;   // +1 avance (↑), -1 recule (↓)
+    const dz = input.down - input.up;
+    const turnInput = dx;
+    const forwardInput = dz;
     const moving = turnInput !== 0 || forwardInput !== 0;
 
-
     if (moving) {
-      // 1) ROTATION : ← → tournent le joueur de ±turnSpeed rad/s
-      //    indépendamment de la caméra, plus de feedback loop
       if (turnInput !== 0) {
         angle += turnInput * turnSpeed * dt;
-        // normalise pour éviter l'accumulation infinie
         if (angle > Math.PI) angle -= Math.PI * 2;
         if (angle < -Math.PI) angle += Math.PI * 2;
       }
-    
-      // 2) TRANSLATION : on avance dans le forward actuel du joueur
+
       if (forwardInput !== 0) {
         const fwdX = Math.sin(angle);
         const fwdZ = Math.cos(angle);
         x += fwdX * speed * forwardInput * dt;
         z += fwdZ * speed * forwardInput * dt;
-    
+
         if (bounds) {
           if (x < bounds.minX) x = bounds.minX;
           if (x > bounds.maxX) x = bounds.maxX;
           if (z < bounds.minZ) z = bounds.minZ;
           if (z > bounds.maxZ) z = bounds.maxZ;
         }
-    
+
         walkAccum += speed * dt;
         bobPhase += dt * 10;
         if (walkAccum > 180) {
@@ -184,7 +197,6 @@ export function createHubPlayer(options) {
           particles.dust(x, -30, { count: 3 });
         }
       } else {
-        // Tourne sur place : toujours un peu d'anim de marche
         bobPhase += dt * 6;
       }
     } else {
@@ -192,18 +204,97 @@ export function createHubPlayer(options) {
       walkAccum = 0;
     }
 
+    updateHairPhysics(dt);
     applyTransform();
+  }
+
+  /**
+   * Simule l'inertie des cheveux.
+   *
+   * Principe : on calcule la vitesse instantanée (Δposition / dt) à partir
+   * de la position précédente, on la lisse exponentiellement pour éviter
+   * les saccades, puis on la transforme en offset CSS "lag" sur les mèches.
+   *
+   * Pour que le lag soit dans le repère LOCAL du personnage (les cheveux
+   * traînent derrière sa tête, pas dans l'absolu du monde), on projette
+   * la vitesse mondiale (vx, vz) sur les axes forward/side du joueur.
+   *
+   * @param {number} dt - delta en secondes
+   */
+  function updateHairPhysics(dt) {
+    if (dt <= 0) {
+      hair.style.setProperty('--hair-lag-x', '0px');
+      hair.style.setProperty('--hair-lag-z', '0px');
+      hair.style.setProperty('--hair-sway', '0deg');
+      hair.style.setProperty('--hair-bounce', '0px');
+      return;
+    }
+
+    // 1) Vitesse instantanée dans le monde
+    const worldVX = (x - prevX) / dt;
+    const worldVZ = (z - prevZ) / dt;
+
+    // 2) Projection dans le repère local du personnage
+    //    forward = (sin a, 0, cos a)
+    //    right   = (cos a, 0, -sin a)
+    const fwdX = Math.sin(angle);
+    const fwdZ = Math.cos(angle);
+    const rightX = Math.cos(angle);
+    const rightZ = -Math.sin(angle);
+    const localVForward = worldVX * fwdX + worldVZ * fwdZ;
+    const localVSide = worldVX * rightX + worldVZ * rightZ;
+
+    // 3) Vitesse angulaire (signée, chemin le plus court)
+    let dAngle = angle - prevAngle;
+    if (dAngle > Math.PI) dAngle -= Math.PI * 2;
+    if (dAngle < -Math.PI) dAngle += Math.PI * 2;
+    const instAngVel = dAngle / dt;
+
+    // 4) Lissage exponentiel (spring-damper simplifié) — les cheveux
+    //    rattrapent la vitesse instantanée avec une latence perceptible.
+    const smooth = 1 - Math.exp(-dt * 7);
+    hairVelX = hairVelX + (localVSide - hairVelX) * smooth;
+    hairVelZ = hairVelZ + (localVForward - hairVelZ) * smooth;
+    hairAngVel = hairAngVel + (instAngVel - hairAngVel) * smooth;
+
+    // 5) Conversion en offsets CSS. Les cheveux traînent à l'OPPOSÉ de
+    //    la vitesse (inertie). Clampé pour éviter des exagérations.
+    const DIV = 28;
+    const MAX_LAG = 24;
+    let lagX = -hairVelX / DIV;
+    let lagZ = -hairVelZ / DIV;
+    if (lagX >  MAX_LAG) lagX =  MAX_LAG;
+    if (lagX < -MAX_LAG) lagX = -MAX_LAG;
+    if (lagZ >  MAX_LAG) lagZ =  MAX_LAG;
+    if (lagZ < -MAX_LAG) lagZ = -MAX_LAG;
+
+    let sway = -hairAngVel * 6;
+    if (sway >  18) sway =  18;
+    if (sway < -18) sway = -18;
+
+    const bounce = (input.up + input.down + input.left + input.right) > 0
+      ? Math.sin(bobPhase * 2) * 2.5
+      : 0;
+
+    hair.style.setProperty('--hair-lag-x', `${lagX.toFixed(2)}px`);
+    hair.style.setProperty('--hair-lag-z', `${lagZ.toFixed(2)}px`);
+    hair.style.setProperty('--hair-sway', `${sway.toFixed(2)}deg`);
+    hair.style.setProperty('--hair-bounce', `${bounce.toFixed(2)}px`);
+
+    prevX = x;
+    prevZ = z;
+    prevAngle = angle;
   }
 
   function applyTransform() {
     const isMoving =
       (input.up + input.down + input.left + input.right) > 0;
     root.classList.toggle('is-walking', isMoving);
-  
+
     const bob = isMoving ? Math.sin(bobPhase) * 6 : 0;
     const sway = isMoving ? Math.sin(bobPhase * 0.5) * 3 : 0;
     const deg = (angle * 180) / Math.PI;
-  
+
     root.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
     bodyWrap.style.transform =
       `translate3d(0px, ${bob}px, 0px) rotateY(${deg}deg) rotateZ(${sway}deg)`;
@@ -213,31 +304,14 @@ export function createHubPlayer(options) {
   // API
   // ---------------------------------------------------------------------
 
-  function getPosition() {
-    return { x, y, z };
-  }
-
-  /**
-   * @returns {number} angle en radians
-   */
-  function getAngle() {
-    return angle;
-  }
-
-  /**
-   * @param {{x:number, y:number, z:number}} pos
-   */
+  function getPosition() { return { x, y, z }; }
+  function getAngle()    { return angle; }
   function setPosition(pos) {
     x = pos.x; y = pos.y; z = pos.z;
+    prevX = x; prevZ = z; // reset pour éviter un flash de vitesse
     applyTransform();
   }
-
-  /**
-   * @param {import('./hubMap.js').HubBounds} b
-   */
-  function setBounds(b) {
-    bounds = b;
-  }
+  function setBounds(b) { bounds = b; }
 
   function destroy() {
     unsubs.forEach((u) => u());
@@ -253,21 +327,4 @@ export function createHubPlayer(options) {
     setBounds,
     destroy,
   });
-}
-
-// ---------------------------------------------------------------------
-// HELPERS
-// ---------------------------------------------------------------------
-
-/**
- * Interpolation d'angles : prend le chemin court.
- * @param {number} a
- * @param {number} b
- * @param {number} t
- */
-function lerpAngle(a, b, t) {
-  let diff = b - a;
-  while (diff > Math.PI) diff -= Math.PI * 2;
-  while (diff < -Math.PI) diff += Math.PI * 2;
-  return a + diff * t;
 }

@@ -9,8 +9,14 @@
  *   Le joueur spawn à l'endroit et avec l'angle définis dans la map
  *   (par défaut z = +400, angle = 180°, regard vers -Z).
  *
+ * CAMÉRA
+ *   Cette scène utilise la nouvelle caméra troisième personne fixe
+ *   (src/hub/thirdPersonCamera.js). La caméra reste toujours derrière
+ *   le joueur, suit automatiquement sa position et sa rotation, et
+ *   n'est pas contrôlable par le joueur (pas de souris, pas de joystick).
+ *
  * DEBUG
- *   Pendant la scène hub, la follow camera est exposée sur
+ *   Pendant la scène hub, la caméra est exposée sur
  *   `window.__TETRIS64__.hub`. Voir le bas du fichier pour l'API.
  */
 
@@ -18,7 +24,7 @@ import { SCENES, ACTIONS, GAME_MODES } from '../core/constants.js';
 import { createHubMap } from '../hub/hubMap.js';
 import { createHubPlayer } from '../hub/player.js';
 import { createPaintings } from '../hub/paintings.js';
-import { createFollowCamera } from '../hub/followCamera.js';
+import { createThirdPersonCamera } from '../hub/thirdPersonCamera.js';
 import { el } from '../utils/helpers.js';
 
 /**
@@ -46,8 +52,8 @@ export function createHubScene() {
   let player = null;
   /** @type {ReturnType<typeof createPaintings> | null} */
   let paintings = null;
-  /** @type {ReturnType<typeof createFollowCamera> | null} */
-  let follow = null;
+  /** @type {ReturnType<typeof createThirdPersonCamera> | null} */
+  let camera = null;
 
   /** @type {Array<() => void>} */
   let unsubs = [];
@@ -109,35 +115,20 @@ export function createHubScene() {
     });
 
     // ---------------------------------------------------------------
-    // 5) CAMÉRA — followCamera Mario-64 style
+    // 5) CAMÉRA TROISIÈME PERSONNE (fixe derrière le joueur)
     // ---------------------------------------------------------------
-    const camBounds = {
-      minX: bounds.minX + 60,
-      maxX: bounds.maxX - 60,
-      minZ: bounds.minZ + 60,
-      maxZ: bounds.maxZ - 60,
-    };
-    follow = createFollowCamera({
+    camera = createThirdPersonCamera({
       camera: ctx.camera,
       target: player,
-      baseDistance: 480,
-      baseHeight: -240,
-      lookAheadDistance: 120,
-      deadzoneRadius: 0,
-      lerpPosXZ: 0.22,
-      lerpPosY: 0.25,
-      lerpRot: 0.25,
-      tiltDeg: 18,
-      speedDistanceFactor: 0,
-      speedHeightFactor: 0,
-      maxSpeedExtraDist: 0,
-      bounds: camBounds,
-      maxYawOffsetDeg: 45,
-      walls: map.getWalls(),   // ← LA LIGNE CRITIQUE
-      wallPadding: 40,
-      minDistanceToPlayer: 150,
+      distance: 420,
+      height: -220,
+      tiltDeg: 16,
+      lerpPos: 0.12,
+      lerpRot: 0.10,
     });
-    follow.enable();
+    camera.enable();
+    // Placement instantané pour éviter un glissement à l'entrée
+    camera.snapToTarget();
 
     // ---------------------------------------------------------------
     // 6) PROMPT D'INTERACTION
@@ -189,7 +180,7 @@ export function createHubScene() {
     }
 
     if (paintings) paintings.update(dt);
-    if (follow) follow.update(dt);
+    if (camera) camera.update(dt);
   }
 
   function tryEnterPainting() {
@@ -200,7 +191,7 @@ export function createHubScene() {
     entering = true;
 
     ctx.audio.playSfx(ctx.audio.SFX.HUB_DOOR);
-    if (follow) follow.disable();
+    if (camera) camera.disable();
 
     ctx.effects.flash('rgba(255,255,255,0.75)', 220);
     ctx.camera.moveTo(
@@ -225,7 +216,7 @@ export function createHubScene() {
   async function goBackToTitle() {
     if (!ctx || entering) return;
     entering = true;
-    if (follow) follow.disable();
+    if (camera) camera.disable();
     await ctx.switchTo(SCENES.TITLE, { transition: 'fade' });
   }
 
@@ -252,29 +243,23 @@ export function createHubScene() {
     const w = /** @type {any} */ (window);
     w.__TETRIS64__ = w.__TETRIS64__ || {};
     w.__TETRIS64__.hub = {
-      follow,
+      camera,
       player,
       paintings,
       map,
 
-      // Raccourcis tweaking
-      dist: (d) => follow && follow.setBaseDistance(d),
-      height: (h) => follow && follow.setBaseHeight(h),
-      lookAhead: (d) => follow && follow.setLookAhead(d),
-      deadzone: (r) => follow && follow.setDeadzone(r),
-      tilt: (deg) => follow && follow.setTilt(deg),
-      lerp: (posXZ, posY, rot) => follow && follow.setLerp({ posXZ, posY, rot }),
-      speed: (dist, height, max) => follow && follow.setSpeedEffect({
-        distFactor: dist, heightFactor: height, maxExtraDist: max,
-      }),
-      yawLimit: (deg) => follow && follow.setYawLimit && follow.setYawLimit(deg),
+      // Raccourcis tweaking caméra
+      dist:   (d)   => camera && camera.setDistance(d),
+      height: (h)   => camera && camera.setHeight(h),
+      tilt:   (deg) => camera && camera.setTilt(deg),
+      lerp:   (pos, rot) => camera && camera.setLerp({ pos, rot }),
 
       // Téléport du joueur
       tpPlayer: (x, y, z) => player && player.setPosition({ x, y, z }),
 
       // Status complet
       status: () => ({
-        camera: follow?.getStatus(),
+        camera: camera?.getStatus(),
         player: player?.getPosition(),
         angle:  player?.getAngle(),
       }),
@@ -293,8 +278,8 @@ export function createHubScene() {
     if (paintings) paintings.destroy();
     if (player) player.destroy();
     if (map) map.destroy();
-    if (follow) follow.destroy();
-    paintings = null; player = null; map = null; follow = null;
+    if (camera) camera.destroy();
+    paintings = null; player = null; map = null; camera = null;
     if (interactPromptEl && interactPromptEl.parentNode) {
       interactPromptEl.parentNode.removeChild(interactPromptEl);
     }
