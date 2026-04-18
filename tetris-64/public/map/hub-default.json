@@ -1,13 +1,51 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "Hub",
   "gridSize": 100,
   "floor": {
     "width": 1600,
     "depth": 2000,
-    "wallHeight": 800
+    "wallHeight": 800,
+    "visible": true,
+    "pattern": "checker"
+  },
+  "ceiling": {
+    "visible": true
+  },
+  "decorations": {
+    "pillars": false,
+    "centerCarpet": false,
+    "entryRug": false
   },
   "walls": [
+    {
+      "x1": -800,
+      "z1": -1000,
+      "x2": 800,
+      "z2": -1000,
+      "visible": true
+    },
+    {
+      "x1": 800,
+      "z1": -1000,
+      "x2": 800,
+      "z2": 1000,
+      "visible": false
+    },
+    {
+      "x1": 800,
+      "z1": 1000,
+      "x2": -800,
+      "z2": 1000,
+      "visible": false
+    },
+    {
+      "x1": -800,
+      "z1": 1000,
+      "x2": -800,
+      "z2": -1000,
+      "visible": false
+    }
   ],
   "paintings": [
     {
@@ -38,6 +76,6 @@
   "spawn": {
     "x": 0,
     "z": 400,
-    "angle": 180
+    "angle": 0
   }
 }
