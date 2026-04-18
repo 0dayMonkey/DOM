@@ -106,7 +106,7 @@ export function createHubMap(options) {
   carpet.style.width = `${carpetW}px`;
   carpet.style.height = `${carpetD}px`;
   carpet.style.transform =
-    `translate3d(${-carpetW / 2}px, -1px, ${-carpetD / 2}px) rotateX(90deg)`;
+    `translate3d(${-carpetW / 2}px, -801px, 0px) rotateX(90deg)`;
   root.appendChild(carpet);
   }
   // -------------------------------------------------------------------
@@ -138,7 +138,7 @@ export function createHubMap(options) {
 
   const entryRug = el('div', { class: 'hub-map__entry-rug' });
   entryRug.style.transform =
-    `translate3d(${-120}px, -1px, ${depth / 2 - 260}px) rotateX(90deg)`;
+    `translate3d(${-120}px, -1px, -801px) rotateX(90deg)`;
   root.appendChild(entryRug);
 
   // -------------------------------------------------------------------
