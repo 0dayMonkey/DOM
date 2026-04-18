@@ -1,0 +1,49 @@
+{
+    "version": 1,
+    "name": "Hub",
+    "gridSize": 100,
+    "floor": {
+      "width": 1600,
+      "depth": 2000,
+      "wallHeight": 800
+    },
+    "walls": [
+      {
+        "x1": -800,
+        "z1": -1000,
+        "x2": 800,
+        "z2": -1000
+      }
+    ],
+    "paintings": [
+      {
+        "id": "marathon",
+        "label": "MARATHON",
+        "mode": "marathon",
+        "x": -400,
+        "z": -930,
+        "rotationY": 0
+      },
+      {
+        "id": "sprint40",
+        "label": "SPRINT 40L",
+        "mode": "sprint40",
+        "x": 0,
+        "z": -930,
+        "rotationY": 0
+      },
+      {
+        "id": "zen",
+        "label": "ZEN",
+        "mode": "zen",
+        "x": 400,
+        "z": -930,
+        "rotationY": 0
+      }
+    ],
+    "spawn": {
+      "x": 0,
+      "z": 400,
+      "angle": 180
+    }
+  }

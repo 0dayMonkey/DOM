@@ -38,7 +38,7 @@ import { el } from '../utils/helpers.js';
  * @property {{x:number, y:number, z:number}} [spawn]
  * @property {import('./hubMap.js').HubBounds} [bounds]
  * @property {number} [speed=280]
- * @property {number} [turnSpeed=6]
+ * @property {number} [turnSpeed=3.5]
  */
 
 /**
@@ -50,7 +50,7 @@ export function createHubPlayer(options) {
   const particles = options.particles;
   const actionMap = options.actionMap;
   const speed = options.speed ?? 280;
-  const turnSpeed = options.turnSpeed ?? 6;
+  const turnSpeed = options.turnSpeed ?? 3.5;
   let bounds = options.bounds ?? null;
 
   /** Position au sol (y=0). */
@@ -60,7 +60,7 @@ export function createHubPlayer(options) {
 
   /** Orientation en radians.
    *  angle = π → rotateY(180) → regarde vers -Z (fond de la salle). */
-  let angle = Math.PI;
+  let angle = options.initialAngle ?? Math.PI;
 
   /** Animations de pas. */
   let walkAccum = 0;
@@ -119,8 +119,8 @@ export function createHubPlayer(options) {
   // Bindings explicites (WASD-style si re-mappé)
   bindInputAction(ACTIONS.MOVE_UP,    'up');
   bindInputAction(ACTIONS.MOVE_DOWN,  'down');
-  bindInputAction(ACTIONS.MOVE_LEFT,  'left');
-  bindInputAction(ACTIONS.MOVE_RIGHT, 'right');
+  bindInputAction(ACTIONS.MOVE_LEFT,  'right');
+  bindInputAction(ACTIONS.MOVE_RIGHT, 'left');
 
   // Fallback pour les flèches ↑/↓ qui, dans le keymap par défaut, sont
   // mappées à ROTATE_CW et SOFT_DROP (pour le jeu Tetris). Dans le hub,
@@ -144,44 +144,48 @@ export function createHubPlayer(options) {
     //   dz < 0 = vers -Z (fond / mur des tableaux)
     const dx = input.right - input.left;
     const dz = input.down - input.up;  // ArrowDown → +Z, ArrowUp → -Z
-    const moving = dx !== 0 || dz !== 0;
+    const turnInput = dx;       // -1 gauche, +1 droite
+    const forwardInput = -dz;   // +1 avance (↑), -1 recule (↓)
+    const moving = turnInput !== 0 || forwardInput !== 0;
+
 
     if (moving) {
-      // Calcule l'angle désiré. La convention est :
-      //   angle = 0    → forward (sin 0, 0, cos 0) = (0, 0, 1) = +Z (vers avant)
-      //   angle = π    → forward (0, 0, -1) = -Z (vers fond)
-      //   angle = +π/2 → forward (+1, 0, 0) = +X
-      //   angle = -π/2 → forward (-1, 0, 0) = -X
-      //
-      // Pour un vecteur désiré (dx, dz), l'angle qui donne forward = (dx, dz)
-      // normalisé, on veut sin(angle) = dx/|d| et cos(angle) = dz/|d|.
-      // Donc angle = atan2(dx, dz).
-      const targetAngle = Math.atan2(dx, dz);
-      angle = lerpAngle(angle, targetAngle, Math.min(1, turnSpeed * dt));
-
-      const len = Math.hypot(dx, dz) || 1;
-      const nx = dx / len;
-      const nz = dz / len;
-      x += nx * speed * dt;
-      z += nz * speed * dt;
-
-      // Clamp aux bornes de la salle
-      if (bounds) {
-        if (x < bounds.minX) x = bounds.minX;
-        if (x > bounds.maxX) x = bounds.maxX;
-        if (z < bounds.minZ) z = bounds.minZ;
-        if (z > bounds.maxZ) z = bounds.maxZ;
+      // 1) ROTATION : ← → tournent le joueur de ±turnSpeed rad/s
+      //    indépendamment de la caméra, plus de feedback loop
+      if (turnInput !== 0) {
+        angle += turnInput * turnSpeed * dt;
+        // normalise pour éviter l'accumulation infinie
+        if (angle > Math.PI) angle -= Math.PI * 2;
+        if (angle < -Math.PI) angle += Math.PI * 2;
       }
-
-      walkAccum += speed * dt;
-      bobPhase += dt * 10;
-      if (walkAccum > 180) {
-        walkAccum = 0;
-        audio.playSfx(audio.SFX.HUB_FOOTSTEP, {
-          volume: 0.5,
-          rate: 0.9 + Math.random() * 0.2,
-        });
-        particles.dust(x, -30, { count: 3 });
+    
+      // 2) TRANSLATION : on avance dans le forward actuel du joueur
+      if (forwardInput !== 0) {
+        const fwdX = Math.sin(angle);
+        const fwdZ = Math.cos(angle);
+        x += fwdX * speed * forwardInput * dt;
+        z += fwdZ * speed * forwardInput * dt;
+    
+        if (bounds) {
+          if (x < bounds.minX) x = bounds.minX;
+          if (x > bounds.maxX) x = bounds.maxX;
+          if (z < bounds.minZ) z = bounds.minZ;
+          if (z > bounds.maxZ) z = bounds.maxZ;
+        }
+    
+        walkAccum += speed * dt;
+        bobPhase += dt * 10;
+        if (walkAccum > 180) {
+          walkAccum = 0;
+          audio.playSfx(audio.SFX.HUB_FOOTSTEP, {
+            volume: 0.5,
+            rate: 0.9 + Math.random() * 0.2,
+          });
+          particles.dust(x, -30, { count: 3 });
+        }
+      } else {
+        // Tourne sur place : toujours un peu d'anim de marche
+        bobPhase += dt * 6;
       }
     } else {
       bobPhase += dt * 3;
@@ -192,12 +196,17 @@ export function createHubPlayer(options) {
   }
 
   function applyTransform() {
-    const bob = Math.sin(bobPhase) * 4;
+    const isMoving =
+      (input.up + input.down + input.left + input.right) > 0;
+    root.classList.toggle('is-walking', isMoving);
+  
+    const bob = isMoving ? Math.sin(bobPhase) * 6 : 0;
+    const sway = isMoving ? Math.sin(bobPhase * 0.5) * 3 : 0;
     const deg = (angle * 180) / Math.PI;
-    // Position : (x, y, z) dans le monde hub
+  
     root.style.transform = `translate3d(${x}px, ${y}px, ${z}px)`;
-    // Orientation : rotateY(angle_en_deg) + bob vertical
-    bodyWrap.style.transform = `translate3d(0px, ${bob}px, 0px) rotateY(${deg}deg)`;
+    bodyWrap.style.transform =
+      `translate3d(0px, ${bob}px, 0px) rotateY(${deg}deg) rotateZ(${sway}deg)`;
   }
 
   // ---------------------------------------------------------------------

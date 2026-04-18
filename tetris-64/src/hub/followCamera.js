@@ -56,7 +56,7 @@
  *     ry_deg = atan2(dx, -dz) × 180 / π
  */
 
-import { lerp, lerpAngle } from '../utils/math3d.js';
+import { lerp, lerpAngle, shortestDeltaDeg } from '../utils/math3d.js';
 
 /**
  * @typedef {Object} FollowCameraOptions
@@ -82,6 +82,9 @@ import { lerp, lerpAngle } from '../utils/math3d.js';
 export function createFollowCamera(options) {
   const camera = options.camera;
   const target = options.target;
+
+
+  let maxYawOffsetDeg = options.maxYawOffsetDeg ?? 45;
 
   // Paramètres de comportement
   let baseDistance = options.baseDistance ?? 480;
@@ -189,9 +192,25 @@ export function createFollowCamera(options) {
     curZ = lerp(curZ, clampedPos.z, posLerp);
     curY = lerp(curY, clampedPos.y, lerpPosY); // Y toujours rapide, pas de deadzone
 
+    if (bounds) {
+      curX = Math.max(bounds.minX, Math.min(bounds.maxX, curX));
+      curZ = Math.max(bounds.minZ, Math.min(bounds.maxZ, curZ));
+    }
+
     // ---------- 6) Rotation vers le lookAt, TRÈS LENTE ----------
+    // APRÈS
     const idealRy = computeRyTo({ x: curX, z: curZ }, idealLookAt);
     curRy = lerpAngle(curRy, idealRy, lerpRot);
+
+    // Clamp : curRy ne peut jamais s'écarter de plus de maxYawOffsetDeg
+    // de l'angle idéal (= derrière le joueur). On calcule l'écart court
+    // et on le borne.
+    const delta = shortestDeltaDeg(idealRy, curRy);
+    if (delta > maxYawOffsetDeg) {
+      curRy = idealRy + maxYawOffsetDeg;
+    } else if (delta < -maxYawOffsetDeg) {
+      curRy = idealRy - maxYawOffsetDeg;
+    }
 
     // ---------- 7) Apply ----------
     apply();
@@ -253,32 +272,21 @@ export function createFollowCamera(options) {
    */
   function applyBoundsCollision(idealPos, playerPos) {
     if (!bounds) return idealPos;
-
-    let { x, y, z } = idealPos;
+  
     const { minX, maxX, minZ, maxZ } = bounds;
-
-    // Si on est dans la salle, rien à faire
-    if (x >= minX && x <= maxX && z >= minZ && z <= maxZ) return idealPos;
-
-    // Sinon, on scale la direction player→cam pour atterrir pile à la bordure
-    const vx = x - playerPos.x;
-    const vz = z - playerPos.z;
-
-    // t = facteur pour que playerPos + v*t soit à la bordure la plus proche
-    // On calcule le t max pour chaque bordure qu'on dépasse, puis on prend le min
-    let t = 1; // si rien ne dépasse, on garde la position idéale
-    if (x < minX && vx !== 0) t = Math.min(t, (minX - playerPos.x) / vx);
-    if (x > maxX && vx !== 0) t = Math.min(t, (maxX - playerPos.x) / vx);
-    if (z < minZ && vz !== 0) t = Math.min(t, (minZ - playerPos.z) / vz);
-    if (z > maxZ && vz !== 0) t = Math.min(t, (maxZ - playerPos.z) / vz);
-
-    // Clamp t pour que la caméra ne se retrouve pas devant le joueur
-    t = Math.max(0.1, Math.min(1, t));
-
+  
+    // Clamp dur : on prend la position idéale, et on la ramène dans les bounds
+    // même si ça signifie que la caméra se rapproche du joueur.
+    const clampedX = Math.max(minX, Math.min(maxX, idealPos.x));
+    const clampedZ = Math.max(minZ, Math.min(maxZ, idealPos.z));
+  
+    // On accepte que la caméra soit plus proche du joueur que baseDistance
+    // dans ce cas (coin de salle, mur dans le dos). Elle ne passera JAMAIS
+    // à travers le mur.
     return {
-      x: playerPos.x + vx * t,
-      y,
-      z: playerPos.z + vz * t,
+      x: clampedX,
+      y: idealPos.y,
+      z: clampedZ,
     };
   }
 

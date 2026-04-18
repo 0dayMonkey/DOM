@@ -61,7 +61,6 @@
     left: 0;
     transform-style: preserve-3d;
     will-change: transform;
-    animation: player-idle 2.4s ease-in-out infinite;
   }
   
   .hub-player__body,

@@ -1,12 +1,16 @@
 /**
  * hubMap.js — Construction de la salle du hub (château N64).
  *
- * Crée le sol, les 4 murs, le plafond, un tapis central et quelques détails
- * de décor (socles, piliers) directement en DOM 3D. Pas de modèles externes :
- * tout est de la CSS (transform + background).
+ * Prend en entrée une `mapData` optionnelle (format mapcreator) qui décrit
+ * le sol, les murs et les dimensions. Si aucune `mapData` n'est fournie,
+ * on construit une salle rectangulaire par défaut avec 4 murs.
  *
- * Le module expose également les limites de déplacement du joueur
- * (getBounds) pour qu'il puisse rester dans la salle.
+ * Format mapData :
+ * {
+ *   floor: { width, depth, wallHeight },
+ *   walls: [{ x1, z1, x2, z2 }, ...],
+ *   spawn, paintings  (consommés par hubScene, pas par ce module)
+ * }
  *
  * REPÈRE DE COORDONNÉES
  * ---------------------
@@ -15,27 +19,42 @@
  *   - axe Y : hauteur négative  (le sol est à y=0, le plafond à y=-wallHeight)
  *   - axe Z : profondeur       (+Z = vers la caméra, −Z = vers le fond)
  *
- * ORIENTATION DES MURS (rappel CSS) :
- *   - Par défaut, la "face avant" d'un élément DOM pointe vers +Z.
- *   - rotateY(+90)  = la face tourne vers +X (mur à gauche regardant l'intérieur)
- *   - rotateY(-90)  = la face tourne vers -X (mur à droite regardant l'intérieur)
- *   - rotateY(180)  = la face tourne vers -Z (mur avant regardant le fond)
- *   - rotateX(+90)  = la face pointe vers +Y (sol regardant vers le haut)
- *   - rotateX(-90)  = la face pointe vers -Y (plafond regardant vers le bas)
- *
- * CONVENTION DE TRANSFORMATION
- *   Les transformations s'appliquent dans l'ordre `translate` puis `rotate`.
- *   Le point d'origine (coin haut-gauche de l'élément) est translaté, puis
- *   l'élément pivote autour de ce point. On choisit les coordonnées du
- *   coin haut-gauche pour qu'après rotation, le rectangle s'étende au bon
- *   endroit dans la salle.
+ * CONVENTION MURS
+ * ---------------
+ *   Un mur est un segment (x1,z1)→(x2,z2). On construit un rectangle 3D
+ *   de longueur = ||(x2-x1, z2-z1)|| et hauteur = wallHeight, orienté
+ *   perpendiculairement au segment. La face "intérieure" du mur (visible
+ *   depuis l'intérieur de la salle) dépend de l'ordre des sommets :
+ *   pour une salle rectangulaire parcourue dans le sens horaire vu de
+ *   dessus, la face visible est côté intérieur. Pour des murs intérieurs,
+ *   la face sera visible des deux côtés de toute façon.
  */
 
 import { el } from '../utils/helpers.js';
 
 /**
+ * @typedef {Object} WallSegment
+ * @property {number} x1
+ * @property {number} z1
+ * @property {number} x2
+ * @property {number} z2
+ */
+
+/**
+ * @typedef {Object} MapData
+ * @property {number} [version]
+ * @property {string} [name]
+ * @property {number} [gridSize]
+ * @property {{width:number, depth:number, wallHeight:number}} [floor]
+ * @property {WallSegment[]} [walls]
+ * @property {any[]} [paintings]
+ * @property {{x:number, z:number, angle:number}} [spawn]
+ */
+
+/**
  * @typedef {Object} HubMapOptions
  * @property {HTMLElement} host
+ * @property {MapData} [mapData]
  * @property {number} [width=1600]
  * @property {number} [depth=2000]
  * @property {number} [wallHeight=800]
@@ -53,10 +72,13 @@ import { el } from '../utils/helpers.js';
  * @param {HubMapOptions} options
  */
 export function createHubMap(options) {
-  const width = options.width ?? 1600;
-  const depth = options.depth ?? 2000;
-  const wallHeight = options.wallHeight ?? 800;
   const host = options.host;
+  const mapData = options.mapData ?? null;
+
+  // Dimensions : mapData a priorité, sinon options, sinon défauts
+  const width = mapData?.floor?.width ?? options.width ?? 1600;
+  const depth = mapData?.floor?.depth ?? options.depth ?? 2000;
+  const wallHeight = mapData?.floor?.wallHeight ?? options.wallHeight ?? 800;
 
   const root = el('div', { class: 'hub-map' });
   host.appendChild(root);
@@ -65,10 +87,6 @@ export function createHubMap(options) {
   // SOL (damier + tapis)
   // -------------------------------------------------------------------
 
-  // Le sol est un rectangle de taille (width × depth) posé à plat.
-  // On le tourne de 90° autour de X pour qu'il soit horizontal, face vers +Y.
-  // Son coin haut-gauche (avant rotation) est placé tel qu'après rotation
-  // le rectangle couvre X ∈ [-width/2, +width/2], Z ∈ [-depth/2, +depth/2].
   const floor = el('div', { class: 'hub-map__floor' });
   floor.style.width = `${width}px`;
   floor.style.height = `${depth}px`;
@@ -76,13 +94,12 @@ export function createHubMap(options) {
     `translate3d(${-width / 2}px, 0px, ${-depth / 2}px) rotateX(90deg)`;
   root.appendChild(floor);
 
-  // Tapis rouge central au milieu du sol
+  // Tapis rouge central
   const carpetW = Math.round(width * 0.3);
   const carpetD = Math.round(depth * 0.8);
   const carpet = el('div', { class: 'hub-map__carpet' });
   carpet.style.width = `${carpetW}px`;
   carpet.style.height = `${carpetD}px`;
-  // -1px en Y pour éviter le z-fighting avec le sol
   carpet.style.transform =
     `translate3d(${-carpetW / 2}px, -1px, ${-carpetD / 2}px) rotateX(90deg)`;
   root.appendChild(carpet);
@@ -91,8 +108,6 @@ export function createHubMap(options) {
   // PLAFOND
   // -------------------------------------------------------------------
 
-  // Même technique que le sol, mais élevé à y=-wallHeight et tourné de -90°
-  // pour que sa face (avec texture bois) regarde vers le bas.
   const ceiling = el('div', { class: 'hub-map__ceiling' });
   ceiling.style.width = `${width}px`;
   ceiling.style.height = `${depth}px`;
@@ -101,56 +116,14 @@ export function createHubMap(options) {
   root.appendChild(ceiling);
 
   // -------------------------------------------------------------------
-  // MURS
+  // MURS — générés depuis mapData.walls ou par défaut
   // -------------------------------------------------------------------
 
-  // Chaque mur est un rectangle de largeur "longueur du mur" et de hauteur
-  // wallHeight. On le place dans l'espace 3D via translate + rotate.
+  const wallsData = (mapData?.walls && mapData.walls.length > 0)
+    ? mapData.walls
+    : defaultRectangleWalls(width, depth);
 
-  // --- Mur arrière : z = -depth/2, face regardant vers l'intérieur (+Z).
-  // Pas de rotation nécessaire car par défaut la face pointe déjà vers +Z.
-  // C'est le mur sur lequel on accroche les tableaux.
-  const backWall = el('div', { class: 'hub-map__wall hub-map__wall--back' });
-  backWall.style.width = `${width}px`;
-  backWall.style.height = `${wallHeight}px`;
-  backWall.style.transform =
-    `translate3d(${-width / 2}px, ${-wallHeight}px, ${-depth / 2}px)`;
-  root.appendChild(backWall);
-
-  // --- Mur avant : z = +depth/2, face regardant vers -Z (vers le fond).
-  // rotateY(180) inverse la face pour qu'elle soit visible depuis l'intérieur.
-  // Après rotation, la "largeur" locale s'étend vers -X, donc on pose le coin
-  // haut-gauche d'origine à x = +width/2 pour que la face finale couvre
-  // [-width/2, +width/2].
-  const frontWall = el('div', { class: 'hub-map__wall hub-map__wall--front' });
-  frontWall.style.width = `${width}px`;
-  frontWall.style.height = `${wallHeight}px`;
-  frontWall.style.transform =
-    `translate3d(${width / 2}px, ${-wallHeight}px, ${depth / 2}px) rotateY(180deg)`;
-  root.appendChild(frontWall);
-
-  // --- Mur gauche : x = -width/2, face regardant vers +X.
-  // La largeur du mur dans le monde est `depth` (il s'étend du fond à l'avant).
-  // rotateY(90) : la direction "largeur" locale (+X) devient -Z monde.
-  // Coin haut-gauche à z=+depth/2, ainsi après rotation le mur va de
-  // z=+depth/2 vers z=-depth/2 en longeant x=-width/2.
-  const leftWall = el('div', { class: 'hub-map__wall hub-map__wall--left' });
-  leftWall.style.width = `${depth}px`;
-  leftWall.style.height = `${wallHeight}px`;
-  leftWall.style.transform =
-    `translate3d(${-width / 2}px, ${-wallHeight}px, ${depth / 2}px) rotateY(90deg)`;
-  root.appendChild(leftWall);
-
-  // --- Mur droit : x = +width/2, face regardant vers -X.
-  // rotateY(-90) : la direction "largeur" locale (+X) devient +Z monde.
-  // Coin haut-gauche à z=-depth/2 pour que le mur aille de
-  // z=-depth/2 vers z=+depth/2 en longeant x=+width/2.
-  const rightWall = el('div', { class: 'hub-map__wall hub-map__wall--right' });
-  rightWall.style.width = `${depth}px`;
-  rightWall.style.height = `${wallHeight}px`;
-  rightWall.style.transform =
-    `translate3d(${width / 2}px, ${-wallHeight}px, ${-depth / 2}px) rotateY(-90deg)`;
-  root.appendChild(rightWall);
+  wallsData.forEach((seg) => buildWallSegment(root, seg, wallHeight));
 
   // -------------------------------------------------------------------
   // DÉCORS : 4 piliers aux coins + petit tapis d'entrée
@@ -167,13 +140,10 @@ export function createHubMap(options) {
   pillarPositions.forEach((p) => {
     const pillar = el('div', { class: 'hub-map__pillar' });
     pillar.style.height = `${wallHeight}px`;
-    // Le pillar CSS a width=60 et on le centre sur son point (x, _, z)
     pillar.style.transform = `translate3d(${p.x - 30}px, ${-wallHeight}px, ${p.z}px)`;
     root.appendChild(pillar);
   });
 
-  // Socle / tapis d'entrée (pour contextualiser la position de spawn devant
-  // la caméra initiale). Juste un petit rectangle plat orné.
   const entryRug = el('div', { class: 'hub-map__entry-rug' });
   entryRug.style.transform =
     `translate3d(${-120}px, -1px, ${depth / 2 - 260}px) rotateX(90deg)`;
@@ -184,8 +154,10 @@ export function createHubMap(options) {
   // -------------------------------------------------------------------
 
   /**
-   * Retourne les limites de déplacement du joueur, avec une marge pour
-   * qu'il ne se colle pas aux murs.
+   * Bounds rectangulaires couvrant tout le sol, avec une marge.
+   * Pour une gestion fine des murs intérieurs il faudra ajouter une
+   * vraie collision segment-par-segment côté player.
+   *
    * @returns {HubBounds}
    */
   function getBounds() {
@@ -199,11 +171,18 @@ export function createHubMap(options) {
   }
 
   /**
-   * Dimensions de la salle (pour les autres modules du hub : placement
-   * des tableaux, positionnement de la caméra d'intro, etc.).
+   * Dimensions de la salle.
    */
   function getDimensions() {
     return { width, depth, wallHeight };
+  }
+
+  /**
+   * Liste des segments de murs (utile pour collision player↔walls future).
+   * @returns {WallSegment[]}
+   */
+  function getWalls() {
+    return wallsData.map((w) => ({ ...w }));
   }
 
   function destroy() {
@@ -213,6 +192,68 @@ export function createHubMap(options) {
   return Object.freeze({
     getBounds,
     getDimensions,
+    getWalls,
     destroy,
   });
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+/**
+ * Salle rectangulaire par défaut : 4 murs dans le sens horaire vu de dessus.
+ * @param {number} W
+ * @param {number} D
+ * @returns {WallSegment[]}
+ */
+function defaultRectangleWalls(W, D) {
+  return [
+    { x1: -W / 2, z1: -D / 2, x2:  W / 2, z2: -D / 2 }, // arrière
+    { x1:  W / 2, z1: -D / 2, x2:  W / 2, z2:  D / 2 }, // droit
+    { x1:  W / 2, z1:  D / 2, x2: -W / 2, z2:  D / 2 }, // avant
+    { x1: -W / 2, z1:  D / 2, x2: -W / 2, z2: -D / 2 }, // gauche
+  ];
+}
+
+/**
+ * Construit un mur 3D à partir d'un segment 2D.
+ *
+ * Le mur est un rectangle DOM de taille (length × wallHeight). Son origine
+ * (coin haut-gauche) est placée à (midX - length/2, -wallHeight, midZ),
+ * et on pivote autour d'un axe vertical passant par son centre-bas pour
+ * aligner sa "largeur" avec la direction du segment.
+ *
+ * @param {HTMLElement} root
+ * @param {WallSegment} seg
+ * @param {number} wallHeight
+ */
+function buildWallSegment(root, seg, wallHeight) {
+  const dx = seg.x2 - seg.x1;
+  const dz = seg.z2 - seg.z1;
+  const length = Math.hypot(dx, dz);
+  if (length < 1) return; // segment dégénéré
+
+  // Angle Y : on veut que le vecteur "largeur locale" (+X du rectangle)
+  // soit aligné avec le vecteur (dx, dz) dans le plan monde.
+  // Un rectangle non tourné a sa largeur selon +X ; rotateY(θ) envoie
+  // +X local vers (cos θ, 0, -sin θ) en monde. Pour aligner avec (dx, dz),
+  // on résout : cos θ = dx/L, -sin θ = dz/L → θ = atan2(-dz, dx).
+  const angleDeg = (Math.atan2(-dz, dx) * 180) / Math.PI;
+
+  const midX = (seg.x1 + seg.x2) / 2;
+  const midZ = (seg.z1 + seg.z2) / 2;
+
+  const wall = el('div', { class: 'hub-map__wall hub-map__wall--generated' });
+  wall.style.width = `${length}px`;
+  wall.style.height = `${wallHeight}px`;
+  // Origine = coin haut-gauche du rectangle. On la place de façon que,
+  // APRÈS rotation autour du centre-bas, le mur soit pile sur le segment.
+  // Centre-bas local = (length/2, wallHeight, 0).
+  wall.style.transformOrigin = `${length / 2}px ${wallHeight}px 0`;
+  wall.style.transform =
+    `translate3d(${midX - length / 2}px, ${-wallHeight}px, ${midZ}px) ` +
+    `rotateY(${angleDeg}deg)`;
+
+  root.appendChild(wall);
 }

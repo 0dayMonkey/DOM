@@ -1,12 +1,13 @@
 /**
  * hubScene.js — Scène hub (château/galerie).
  *
- * Utilise une followCamera GTA V–like (voir ../hub/followCamera.js).
+ * Charge optionnellement une map JSON générée par /mapcreator/ depuis
+ *   /public/maps/hub-default.json
+ * Le format est documenté dans hubMap.js (MapData).
  *
  * CONVENTION
- *   Le joueur spawn à z = +400 et regarde vers -Z (angle=π). Les tableaux
- *   sont au fond (z ≈ -950), sans rotation : face naturelle vers +Z,
- *   donc face au joueur.
+ *   Le joueur spawn à l'endroit et avec l'angle définis dans la map
+ *   (par défaut z = +400, angle = 180°, regard vers -Z).
  *
  * DEBUG
  *   Pendant la scène hub, la follow camera est exposée sur
@@ -19,6 +20,16 @@ import { createHubPlayer } from '../hub/player.js';
 import { createPaintings } from '../hub/paintings.js';
 import { createFollowCamera } from '../hub/followCamera.js';
 import { el } from '../utils/helpers.js';
+
+/**
+ * Chemins où on tente de charger la map, dans l'ordre. Le premier qui
+ * répond 200 est utilisé. Ajoute/retire selon ta structure de déploiement.
+ */
+const MAP_URLS = [
+  '/public/maps/hub-default.json',
+  './public/maps/hub-default.json',
+  'public/maps/hub-default.json',
+];
 
 /**
  * @returns {import('./sceneManager.js').Scene}
@@ -60,53 +71,74 @@ export function createHubScene() {
     root = el('div', { class: 'hub-scene' });
     ctx.root.appendChild(root);
 
-    map = createHubMap({ host: root });
+    // ---------------------------------------------------------------
+    // 1) CHARGEMENT DE LA MAP
+    // ---------------------------------------------------------------
+    const mapData = await loadMapData();
+
+    // ---------------------------------------------------------------
+    // 2) CONSTRUCTION DE LA SALLE
+    // ---------------------------------------------------------------
+    map = createHubMap({ host: root, mapData });
     const bounds = map.getBounds();
+
+    // ---------------------------------------------------------------
+    // 3) JOUEUR (spawn depuis la map)
+    // ---------------------------------------------------------------
+    const spawnData = mapData?.spawn ?? { x: 0, z: 400, angle: 180 };
+    const initialAngleRad = ((spawnData.angle ?? 180) * Math.PI) / 180;
 
     player = createHubPlayer({
       host: root,
       actionMap: ctx.input.actionMap,
       audio: ctx.audio,
       particles: ctx.particles,
-      spawn: { x: 0, y: 0, z: 400 },
+      spawn: { x: spawnData.x ?? 0, y: 0, z: spawnData.z ?? 400 },
+      initialAngle: initialAngleRad,
       bounds,
     });
 
+    // ---------------------------------------------------------------
+    // 4) TABLEAUX (depuis la map, ou défauts si aucun)
+    // ---------------------------------------------------------------
+    const paintingDefs = buildPaintingDefs(mapData);
     paintings = createPaintings({
       host: root,
       audio: ctx.audio,
-      definitions: [
-        { id: 'marathon', label: 'MARATHON',   mode: GAME_MODES.MARATHON,   position: { x: -400, y: -280, z: -950 } },
-        { id: 'sprint40', label: 'SPRINT 40L', mode: GAME_MODES.SPRINT_40L, position: { x:    0, y: -280, z: -950 } },
-        { id: 'zen',      label: 'ZEN',        mode: GAME_MODES.ZEN,        position: { x:  400, y: -280, z: -950 } },
-      ],
+      definitions: paintingDefs,
     });
 
-    // Caméra GTA V–like
-    // Bounds caméra un peu plus larges que les bounds joueur pour qu'elle
-    // puisse reculer au-delà des limites de marche sans sortir de la salle.
+    // ---------------------------------------------------------------
+    // 5) CAMÉRA — followCamera Mario-64 style
+    // ---------------------------------------------------------------
     const camBounds = {
-      minX: bounds.minX - 200, maxX: bounds.maxX + 200,
-      minZ: bounds.minZ - 200, maxZ: bounds.maxZ + 200,
+      minX: bounds.minX + 60,
+      maxX: bounds.maxX - 60,
+      minZ: bounds.minZ + 60,
+      maxZ: bounds.maxZ - 60,
     };
     follow = createFollowCamera({
       camera: ctx.camera,
       target: player,
       baseDistance: 480,
       baseHeight: -240,
-      lookAheadDistance: 400,
-      deadzoneRadius: 30,
-      lerpPosXZ: 0.12,
-      lerpPosY: 0.18,
-      lerpRot: 0.04,       // ← TRÈS lent, effet GTA signature
-      tiltDeg: 20,
-      speedDistanceFactor: 0.3,
-      speedHeightFactor: 0.15,
-      maxSpeedExtraDist: 120,
+      lookAheadDistance: 120,
+      deadzoneRadius: 0,
+      lerpPosXZ: 0.22,
+      lerpPosY: 0.25,
+      lerpRot: 0.25,
+      tiltDeg: 18,
+      speedDistanceFactor: 0,
+      speedHeightFactor: 0,
+      maxSpeedExtraDist: 0,
       bounds: camBounds,
+      maxYawOffsetDeg: 45,
     });
     follow.enable();
 
+    // ---------------------------------------------------------------
+    // 6) PROMPT D'INTERACTION
+    // ---------------------------------------------------------------
     interactPromptEl = el(
       'div',
       { class: 'hub__interact-prompt is-hidden' },
@@ -117,6 +149,9 @@ export function createHubScene() {
 
     ctx.audio.playMusic(ctx.audio.MUSIC.HUB, { fadeInMs: 800 });
 
+    // ---------------------------------------------------------------
+    // 7) INPUTS
+    // ---------------------------------------------------------------
     unsubs.push(
       ctx.input.actionMap.on(ACTIONS.INTERACT,  (e) => { if (e.phase === 'down') tryEnterPainting(); }),
       ctx.input.actionMap.on(ACTIONS.START,     (e) => { if (e.phase === 'down') tryEnterPainting(); }),
@@ -229,6 +264,7 @@ export function createHubScene() {
       speed: (dist, height, max) => follow && follow.setSpeedEffect({
         distFactor: dist, heightFactor: height, maxExtraDist: max,
       }),
+      yawLimit: (deg) => follow && follow.setYawLimit && follow.setYawLimit(deg),
 
       // Téléport du joueur
       tpPlayer: (x, y, z) => player && player.setPosition({ x, y, z }),
@@ -278,4 +314,58 @@ export function createHubScene() {
   function onResume() { if (ctx) ctx.audio.playMusic(ctx.audio.MUSIC.HUB, { fadeInMs: 400, restart: false }); }
 
   return Object.freeze({ mount, update, destroy, onPause, onResume });
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+/**
+ * Tente de charger le JSON de map depuis plusieurs chemins candidats.
+ * Retourne null si aucun ne répond : on bascule sur la salle par défaut.
+ *
+ * @returns {Promise<import('../hub/hubMap.js').MapData | null>}
+ */
+async function loadMapData() {
+  if (typeof fetch === 'undefined') return null;
+  for (const url of MAP_URLS) {
+    try {
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data === 'object') return data;
+      }
+    } catch (_) {
+      /* on essaie le suivant */
+    }
+  }
+  return null;
+}
+
+/**
+ * Construit la liste de tableaux pour createPaintings() depuis la mapData.
+ * Si la map n'a aucun tableau, on retourne les 3 tableaux par défaut.
+ *
+ * @param {import('../hub/hubMap.js').MapData | null} mapData
+ */
+function buildPaintingDefs(mapData) {
+  const raw = mapData?.paintings;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return defaultPaintingDefs();
+  }
+  return raw.map((p) => ({
+    id: String(p.id ?? 'painting'),
+    label: String(p.label ?? p.id ?? 'MODE'),
+    mode: String(p.mode ?? GAME_MODES.MARATHON),
+    position: { x: p.x ?? 0, y: p.y ?? -280, z: p.z ?? 0 },
+    rotation: p.rotationY ?? 0,
+  }));
+}
+
+function defaultPaintingDefs() {
+  return [
+    { id: 'marathon', label: 'MARATHON',   mode: GAME_MODES.MARATHON,   position: { x: -400, y: -280, z: -950 }, rotation: 0 },
+    { id: 'sprint40', label: 'SPRINT 40L', mode: GAME_MODES.SPRINT_40L, position: { x:    0, y: -280, z: -950 }, rotation: 0 },
+    { id: 'zen',      label: 'ZEN',        mode: GAME_MODES.ZEN,        position: { x:  400, y: -280, z: -950 }, rotation: 0 },
+  ];
 }

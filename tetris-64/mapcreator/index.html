@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<title>Tetris 64 — Map Creator</title>
+<style>
+  :root {
+    --bg: #1A1A2E;
+    --panel: #2A2A45;
+    --text: #FFF8E0;
+    --accent: #F0C040;
+    --danger: #E60012;
+    --ok: #2DB92D;
+    --muted: #8888AA;
+    --wall: #8B4513;
+    --floor-a: #F4E4BC;
+    --floor-b: #C09060;
+    --painting: #B048E0;
+    --spawn: #2DCC2D;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif; overflow: hidden; }
+  body { display: grid; grid-template-columns: 260px 1fr 320px; }
+
+  .panel {
+    background: var(--panel); padding: 16px; overflow-y: auto;
+    border-right: 2px solid #000; display: flex; flex-direction: column; gap: 14px;
+  }
+  .panel--right { border-right: 0; border-left: 2px solid #000; }
+  .panel h1 { font-size: 16px; color: var(--accent); letter-spacing: 2px; }
+  .panel h2 { font-size: 12px; color: var(--accent); text-transform: uppercase;
+    letter-spacing: 2px; margin-top: 8px; border-bottom: 1px solid #444; padding-bottom: 4px; }
+  .tool {
+    background: #1A1A2E; border: 2px solid #000; color: var(--text);
+    padding: 10px 12px; cursor: pointer; text-align: left; font-size: 13px;
+    font-family: inherit; display: flex; align-items: center; gap: 8px;
+  }
+  .tool:hover { background: #3A3A55; }
+  .tool.active { background: var(--accent); color: #1A1A2E; font-weight: bold; }
+  .tool .key { background: rgba(0,0,0,0.2); padding: 1px 6px; border-radius: 2px;
+    font-family: monospace; font-size: 11px; }
+  .row { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+  .row label { min-width: 80px; color: var(--muted); }
+  .row input[type="number"], .row input[type="text"] {
+    flex: 1; background: #1A1A2E; border: 1px solid #444; color: var(--text);
+    padding: 6px 8px; font-family: inherit; font-size: 12px;
+  }
+  .row select {
+    flex: 1; background: #1A1A2E; border: 1px solid #444; color: var(--text);
+    padding: 6px 8px; font-family: inherit; font-size: 12px;
+  }
+  .btn {
+    background: var(--accent); color: #1A1A2E; border: 2px solid #000;
+    padding: 10px; cursor: pointer; font-weight: bold; font-family: inherit;
+    font-size: 13px; letter-spacing: 1px;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn--danger { background: var(--danger); color: white; }
+  .btn--ok { background: var(--ok); color: white; }
+  .btn--ghost { background: transparent; color: var(--text); border: 1px solid #444; }
+
+  .canvas-host { position: relative; background: #111; overflow: hidden; }
+  canvas { display: block; cursor: crosshair; }
+  .hud {
+    position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7);
+    padding: 6px 12px; font-family: monospace; font-size: 12px; pointer-events: none;
+  }
+  .hud--right { left: auto; right: 10px; }
+
+  textarea {
+    width: 100%; min-height: 300px; background: #0E0E1A; color: var(--text);
+    border: 1px solid #444; padding: 8px; font-family: monospace; font-size: 11px;
+    resize: vertical;
+  }
+  .small { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .sep { height: 1px; background: #444; margin: 4px 0; }
+
+  .selection-info {
+    background: #1A1A2E; padding: 10px; border: 1px solid #444; font-size: 12px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .selection-info .title { color: var(--accent); font-weight: bold; }
+  .selection-info .empty { color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+
+<!-- =================== LEFT PANEL =================== -->
+<aside class="panel">
+  <h1>MAP CREATOR</h1>
+  <div class="small">Tetris 64 — Éditeur de hub 2D top-down.</div>
+
+  <h2>Outils</h2>
+  <button class="tool active" data-tool="select"><span class="key">V</span> Sélection</button>
+  <button class="tool" data-tool="wall"><span class="key">W</span> Mur</button>
+  <button class="tool" data-tool="painting"><span class="key">P</span> Tableau</button>
+  <button class="tool" data-tool="spawn"><span class="key">S</span> Spawn</button>
+  <button class="tool" data-tool="delete"><span class="key">D</span> Supprimer</button>
+
+  <h2>Floor</h2>
+  <div class="row"><label>Largeur (X)</label><input type="number" id="floor-w" value="1600" step="100" /></div>
+  <div class="row"><label>Profondeur (Z)</label><input type="number" id="floor-d" value="2000" step="100" /></div>
+  <div class="row"><label>Hauteur murs</label><input type="number" id="wall-h" value="800" step="50" /></div>
+
+  <h2>Vue</h2>
+  <div class="row"><label>Zoom</label><input type="range" id="zoom" min="0.1" max="2" step="0.05" value="0.4" style="flex:1"/></div>
+  <div class="row"><label>Grille</label><input type="number" id="grid" value="100" step="10" /></div>
+  <button class="btn btn--ghost" id="btn-center">Recentrer la vue</button>
+  <button class="btn btn--ghost" id="btn-reset">Nouvelle map</button>
+</aside>
+
+<!-- =================== CANVAS =================== -->
+<div class="canvas-host">
+  <canvas id="canvas"></canvas>
+  <div class="hud" id="hud-pos">0, 0</div>
+  <div class="hud hud--right" id="hud-help">
+    V select · W mur · P tableau · S spawn · D supprimer · clic-milieu/espace+drag pan · molette zoom
+  </div>
+</div>
+
+<!-- =================== RIGHT PANEL =================== -->
+<aside class="panel panel--right">
+  <h1>EXPORT / IMPORT</h1>
+
+  <h2>Sélection</h2>
+  <div id="selection-box" class="selection-info"><div class="empty">Rien de sélectionné</div></div>
+
+  <h2>JSON</h2>
+  <textarea id="json"></textarea>
+  <div class="row">
+    <button class="btn btn--ok" id="btn-copy">Copier</button>
+    <button class="btn" id="btn-apply">Importer</button>
+  </div>
+  <button class="btn" id="btn-download">Télécharger hub.json</button>
+
+  <div class="sep"></div>
+  <div class="small">
+    <b>Coordonnées :</b> même repère que le jeu.<br>
+    X+ droite, Z+ avant (vers l'écran), Z- fond.<br>
+    Origine au centre de la salle.
+  </div>
+</aside>
+
+<script>
+// ============================================================================
+// STATE
+// ============================================================================
+
+const state = {
+  tool: 'select',
+  floor: { width: 1600, depth: 2000, wallHeight: 800 },
+  walls: [],           // [{x1,z1,x2,z2}]
+  paintings: [],       // [{id,label,mode,x,z,rotationY}]
+  spawn: { x: 0, z: 400, angle: 180 },
+  // edit state
+  drawingWall: null,   // {x1,z1} quand on est au 2e clic
+  selected: null,      // {type:'wall'|'painting'|'spawn', index}
+  dragging: null,      // {type, index, grabOffsetX, grabOffsetZ} or {type:'wall-endpoint', index, which:'a'|'b'}
+  // view
+  view: { cx: 0, cz: 0, zoom: 0.4 },
+  panning: null,       // {mx, my, cx, cz}
+  spacePressed: false,
+  grid: 100,
+  mouseWorld: { x: 0, z: 0 },
+};
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// ============================================================================
+// VIEW TRANSFORMS
+// ============================================================================
+
+function resize() {
+  const r = canvas.parentElement.getBoundingClientRect();
+  canvas.width = r.width;
+  canvas.height = r.height;
+  draw();
+}
+window.addEventListener('resize', resize);
+
+function worldToScreen(wx, wz) {
+  return {
+    x: canvas.width / 2 + (wx - state.view.cx) * state.view.zoom,
+    y: canvas.height / 2 + (wz - state.view.cz) * state.view.zoom,
+  };
+}
+function screenToWorld(sx, sy) {
+  return {
+    x: (sx - canvas.width / 2) / state.view.zoom + state.view.cx,
+    z: (sy - canvas.height / 2) / state.view.zoom + state.view.cz,
+  };
+}
+function snap(v) {
+  const g = state.grid;
+  return g > 0 ? Math.round(v / g) * g : Math.round(v);
+}
+
+// ============================================================================
+// DRAW
+// ============================================================================
+
+function draw() {
+  ctx.fillStyle = '#0E0E1A';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawGrid();
+  drawFloor();
+  drawWalls();
+  drawPaintings();
+  drawSpawn();
+  drawDrawingWall();
+  drawSelection();
+}
+
+function drawGrid() {
+  const g = state.grid;
+  if (!g) return;
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  const tl = screenToWorld(0, 0);
+  const br = screenToWorld(canvas.width, canvas.height);
+  const x0 = Math.floor(tl.x / g) * g;
+  const z0 = Math.floor(tl.z / g) * g;
+  ctx.beginPath();
+  for (let x = x0; x < br.x; x += g) {
+    const a = worldToScreen(x, tl.z);
+    const b = worldToScreen(x, br.z);
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+  }
+  for (let z = z0; z < br.z; z += g) {
+    const a = worldToScreen(tl.x, z);
+    const b = worldToScreen(br.x, z);
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+  }
+  ctx.stroke();
+
+  // Axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 1;
+  const ox = worldToScreen(0, tl.z);
+  const oxb = worldToScreen(0, br.z);
+  const oz = worldToScreen(tl.x, 0);
+  const ozb = worldToScreen(br.x, 0);
+  ctx.beginPath();
+  ctx.moveTo(ox.x, ox.y); ctx.lineTo(oxb.x, oxb.y);
+  ctx.moveTo(oz.x, oz.y); ctx.lineTo(ozb.x, ozb.y);
+  ctx.stroke();
+}
+
+function drawFloor() {
+  const w = state.floor.width, d = state.floor.depth;
+  const a = worldToScreen(-w / 2, -d / 2);
+  const b = worldToScreen(w / 2, d / 2);
+  // damier
+  const tile = 128 * state.view.zoom;
+  const pat = document.createElement('canvas');
+  pat.width = pat.height = 128;
+  const pc = pat.getContext('2d');
+  pc.fillStyle = '#F4E4BC'; pc.fillRect(0, 0, 64, 64); pc.fillRect(64, 64, 64, 64);
+  pc.fillStyle = '#C09060'; pc.fillRect(64, 0, 64, 64); pc.fillRect(0, 64, 64, 64);
+  const pattern = ctx.createPattern(pat, 'repeat');
+  ctx.save();
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = pattern;
+  ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+  ctx.restore();
+  // contour sol
+  ctx.strokeStyle = '#F0C040';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+  // label
+  ctx.fillStyle = '#F0C040';
+  ctx.font = '11px monospace';
+  ctx.fillText(`${w} × ${d}`, a.x + 6, a.y + 14);
+}
+
+function drawWalls() {
+  state.walls.forEach((w, i) => {
+    const a = worldToScreen(w.x1, w.z1);
+    const b = worldToScreen(w.x2, w.z2);
+    const isSel = state.selected?.type === 'wall' && state.selected.index === i;
+    ctx.strokeStyle = isSel ? '#F0C040' : '#8B4513';
+    ctx.lineWidth = isSel ? 10 : 8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    // endpoints (uniquement si sélectionné)
+    if (isSel) {
+      ctx.fillStyle = '#F0C040';
+      [a, b].forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill(); });
+    }
+  });
+}
+
+function drawPaintings() {
+  state.paintings.forEach((p, i) => {
+    const pos = worldToScreen(p.x, p.z);
+    const isSel = state.selected?.type === 'painting' && state.selected.index === i;
+    const size = 30 * state.view.zoom;
+    ctx.save();
+    ctx.translate(pos.x, pos.y);
+    ctx.rotate(((p.rotationY ?? 0) * Math.PI) / 180);
+    ctx.fillStyle = modeColor(p.mode);
+    ctx.strokeStyle = isSel ? '#F0C040' : '#000';
+    ctx.lineWidth = isSel ? 3 : 2;
+    ctx.fillRect(-size, -4, size * 2, 8);
+    ctx.strokeRect(-size, -4, size * 2, 8);
+    // "facing arrow" vers +Z local (direction naturelle = face devant le tableau)
+    ctx.strokeStyle = '#FFF';
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(0, 25);
+    ctx.stroke();
+    ctx.restore();
+    // label
+    ctx.fillStyle = '#FFF';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.label || p.id, pos.x, pos.y - 10);
+    ctx.textAlign = 'start';
+  });
+}
+
+function drawSpawn() {
+  const pos = worldToScreen(state.spawn.x, state.spawn.z);
+  const isSel = state.selected?.type === 'spawn';
+  const r = 14;
+  ctx.fillStyle = '#2DCC2D';
+  ctx.strokeStyle = isSel ? '#F0C040' : '#000';
+  ctx.lineWidth = isSel ? 3 : 2;
+  ctx.beginPath(); ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // flèche direction
+  const rad = ((state.spawn.angle ?? 0) * Math.PI) / 180;
+  const tipX = pos.x + Math.sin(rad) * (r + 14);
+  const tipY = pos.y + Math.cos(rad) * (r + 14);
+  ctx.strokeStyle = '#FFF'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(pos.x, pos.y); ctx.lineTo(tipX, tipY); ctx.stroke();
+  ctx.fillStyle = '#FFF';
+  ctx.font = 'bold 10px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('SPAWN', pos.x, pos.y + 3);
+  ctx.textAlign = 'start';
+}
+
+function drawDrawingWall() {
+  if (!state.drawingWall) return;
+  const a = worldToScreen(state.drawingWall.x1, state.drawingWall.z1);
+  const m = worldToScreen(snap(state.mouseWorld.x), snap(state.mouseWorld.z));
+  ctx.strokeStyle = '#F0C040';
+  ctx.lineWidth = 6;
+  ctx.setLineDash([8, 6]);
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(m.x, m.y); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawSelection() {
+  // rien, géré par highlight des items
+}
+
+function modeColor(m) {
+  if (m === 'marathon') return '#B048E0';
+  if (m === 'sprint40') return '#2DB9E5';
+  if (m === 'zen') return '#8CE07A';
+  return '#888';
+}
+
+// ============================================================================
+// HIT TESTING
+// ============================================================================
+
+function distToSegment(px, pz, x1, z1, x2, z2) {
+  const dx = x2 - x1, dz = z2 - z1;
+  const len2 = dx * dx + dz * dz;
+  if (len2 === 0) return Math.hypot(px - x1, pz - z1);
+  let t = ((px - x1) * dx + (pz - z1) * dz) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const cx = x1 + t * dx, cz = z1 + t * dz;
+  return Math.hypot(px - cx, pz - cz);
+}
+
+function hitTest(wx, wz) {
+  const tol = 20 / state.view.zoom; // 20px écran
+
+  // Priorité : spawn > painting > wall endpoint > wall
+  if (Math.hypot(wx - state.spawn.x, wz - state.spawn.z) < tol) {
+    return { type: 'spawn' };
+  }
+  for (let i = state.paintings.length - 1; i >= 0; i--) {
+    const p = state.paintings[i];
+    if (Math.hypot(wx - p.x, wz - p.z) < tol) return { type: 'painting', index: i };
+  }
+  // wall endpoints quand un mur est sélectionné
+  if (state.selected?.type === 'wall') {
+    const w = state.walls[state.selected.index];
+    if (w) {
+      if (Math.hypot(wx - w.x1, wz - w.z1) < tol) return { type: 'wall-endpoint', index: state.selected.index, which: 'a' };
+      if (Math.hypot(wx - w.x2, wz - w.z2) < tol) return { type: 'wall-endpoint', index: state.selected.index, which: 'b' };
+    }
+  }
+  for (let i = state.walls.length - 1; i >= 0; i--) {
+    const w = state.walls[i];
+    if (distToSegment(wx, wz, w.x1, w.z1, w.x2, w.z2) < tol) return { type: 'wall', index: i };
+  }
+  return null;
+}
+
+// ============================================================================
+// INTERACTIONS
+// ============================================================================
+
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  const w = screenToWorld(sx, sy);
+  state.mouseWorld = w;
+  document.getElementById('hud-pos').textContent = `${Math.round(w.x)}, ${Math.round(w.z)}`;
+
+  if (state.panning) {
+    state.view.cx = state.panning.cx - (sx - state.panning.mx) / state.view.zoom;
+    state.view.cz = state.panning.cz - (sy - state.panning.my) / state.view.zoom;
+    draw();
+    return;
+  }
+
+  if (state.dragging) {
+    const sx2 = snap(w.x), sz2 = snap(w.z);
+    const d = state.dragging;
+    if (d.type === 'painting') {
+      const p = state.paintings[d.index];
+      p.x = sx2; p.z = sz2;
+      updateSelectionBox();
+    } else if (d.type === 'spawn') {
+      state.spawn.x = sx2; state.spawn.z = sz2;
+      updateSelectionBox();
+    } else if (d.type === 'wall') {
+      const wll = state.walls[d.index];
+      const dx = sx2 - d.lastX, dz = sz2 - d.lastZ;
+      wll.x1 += dx; wll.z1 += dz; wll.x2 += dx; wll.z2 += dz;
+      d.lastX = sx2; d.lastZ = sz2;
+    } else if (d.type === 'wall-endpoint') {
+      const wll = state.walls[d.index];
+      if (d.which === 'a') { wll.x1 = sx2; wll.z1 = sz2; }
+      else { wll.x2 = sx2; wll.z2 = sz2; }
+    }
+    exportJson();
+    draw();
+    return;
+  }
+
+  if (state.drawingWall) draw();
+});
+
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+  const w = screenToWorld(sx, sy);
+
+  // Pan (clic milieu OU espace+clic gauche)
+  if (e.button === 1 || (e.button === 0 && state.spacePressed)) {
+    state.panning = { mx: sx, my: sy, cx: state.view.cx, cz: state.view.cz };
+    canvas.style.cursor = 'grabbing';
+    e.preventDefault();
+    return;
+  }
+
+  if (e.button !== 0) return;
+
+  const sxw = snap(w.x), szw = snap(w.z);
+
+  if (state.tool === 'wall') {
+    if (!state.drawingWall) {
+      state.drawingWall = { x1: sxw, z1: szw };
+    } else {
+      state.walls.push({ x1: state.drawingWall.x1, z1: state.drawingWall.z1, x2: sxw, z2: szw });
+      state.drawingWall = null;
+      exportJson();
+    }
+    draw();
+    return;
+  }
+
+  if (state.tool === 'painting') {
+    const id = prompt('ID du tableau (ex: marathon) :', 'marathon');
+    if (!id) return;
+    const label = prompt('Label affiché :', id.toUpperCase()) || id.toUpperCase();
+    const mode = prompt('Mode (marathon / sprint40 / zen) :', 'marathon') || 'marathon';
+    state.paintings.push({ id, label, mode, x: sxw, z: szw, rotationY: 0 });
+    state.selected = { type: 'painting', index: state.paintings.length - 1 };
+    updateSelectionBox();
+    exportJson();
+    draw();
+    return;
+  }
+
+  if (state.tool === 'spawn') {
+    state.spawn.x = sxw; state.spawn.z = szw;
+    state.selected = { type: 'spawn' };
+    updateSelectionBox();
+    exportJson();
+    draw();
+    return;
+  }
+
+  if (state.tool === 'delete') {
+    const h = hitTest(w.x, w.z);
+    if (h?.type === 'wall') { state.walls.splice(h.index, 1); }
+    else if (h?.type === 'painting') { state.paintings.splice(h.index, 1); }
+    state.selected = null;
+    updateSelectionBox();
+    exportJson();
+    draw();
+    return;
+  }
+
+  // select tool (ou clic en mode wall sans drawing)
+  const h = hitTest(w.x, w.z);
+  if (h) {
+    state.selected = h;
+    updateSelectionBox();
+    // start drag
+    if (h.type === 'painting') state.dragging = { type: 'painting', index: h.index };
+    else if (h.type === 'spawn') state.dragging = { type: 'spawn' };
+    else if (h.type === 'wall') state.dragging = { type: 'wall', index: h.index, lastX: sxw, lastZ: szw };
+    else if (h.type === 'wall-endpoint') state.dragging = h;
+  } else {
+    state.selected = null;
+    updateSelectionBox();
+  }
+  draw();
+});
+
+canvas.addEventListener('mouseup', () => {
+  state.dragging = null;
+  state.panning = null;
+  canvas.style.cursor = 'crosshair';
+});
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const before = screenToWorld(mx, my);
+  const factor = e.deltaY > 0 ? 0.9 : 1.1;
+  state.view.zoom = Math.max(0.05, Math.min(3, state.view.zoom * factor));
+  document.getElementById('zoom').value = state.view.zoom;
+  const after = screenToWorld(mx, my);
+  state.view.cx += before.x - after.x;
+  state.view.cz += before.z - after.z;
+  draw();
+}, { passive: false });
+
+// Keyboard
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === ' ') { state.spacePressed = true; canvas.style.cursor = 'grab'; e.preventDefault(); }
+  if (e.key.toLowerCase() === 'v') selectTool('select');
+  if (e.key.toLowerCase() === 'w') selectTool('wall');
+  if (e.key.toLowerCase() === 'p') selectTool('painting');
+  if (e.key.toLowerCase() === 's') selectTool('spawn');
+  if (e.key.toLowerCase() === 'd') selectTool('delete');
+  if (e.key === 'Escape') { state.drawingWall = null; state.selected = null; updateSelectionBox(); draw(); }
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (state.selected?.type === 'wall') { state.walls.splice(state.selected.index, 1); state.selected = null; exportJson(); draw(); }
+    else if (state.selected?.type === 'painting') { state.paintings.splice(state.selected.index, 1); state.selected = null; exportJson(); draw(); }
+    updateSelectionBox();
+  }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.key === ' ') { state.spacePressed = false; canvas.style.cursor = 'crosshair'; }
+});
+
+// ============================================================================
+// UI
+// ============================================================================
+
+function selectTool(name) {
+  state.tool = name;
+  state.drawingWall = null;
+  document.querySelectorAll('.tool').forEach(b =>
+    b.classList.toggle('active', b.dataset.tool === name));
+  draw();
+}
+document.querySelectorAll('.tool').forEach(b =>
+  b.addEventListener('click', () => selectTool(b.dataset.tool)));
+
+document.getElementById('floor-w').addEventListener('input', (e) => {
+  state.floor.width = +e.target.value || 1600; exportJson(); draw();
+});
+document.getElementById('floor-d').addEventListener('input', (e) => {
+  state.floor.depth = +e.target.value || 2000; exportJson(); draw();
+});
+document.getElementById('wall-h').addEventListener('input', (e) => {
+  state.floor.wallHeight = +e.target.value || 800; exportJson();
+});
+document.getElementById('zoom').addEventListener('input', (e) => {
+  state.view.zoom = +e.target.value; draw();
+});
+document.getElementById('grid').addEventListener('input', (e) => {
+  state.grid = +e.target.value || 0; draw();
+});
+document.getElementById('btn-center').addEventListener('click', () => {
+  state.view.cx = 0; state.view.cz = 0; draw();
+});
+document.getElementById('btn-reset').addEventListener('click', () => {
+  if (!confirm('Tout effacer ?')) return;
+  state.walls = []; state.paintings = []; state.selected = null;
+  state.spawn = { x: 0, z: 400, angle: 180 };
+  updateSelectionBox(); exportJson(); draw();
+});
+
+document.getElementById('btn-copy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(document.getElementById('json').value);
+    const b = document.getElementById('btn-copy');
+    const t = b.textContent; b.textContent = 'Copié !';
+    setTimeout(() => b.textContent = t, 1000);
+  } catch (_) { alert('Clipboard refusé, sélectionne le texte manuellement.'); }
+});
+
+document.getElementById('btn-apply').addEventListener('click', () => {
+  try {
+    const data = JSON.parse(document.getElementById('json').value);
+    if (data.floor) state.floor = { ...state.floor, ...data.floor };
+    state.walls = Array.isArray(data.walls) ? data.walls : [];
+    state.paintings = Array.isArray(data.paintings) ? data.paintings : [];
+    if (data.spawn) state.spawn = { ...state.spawn, ...data.spawn };
+    if (typeof data.gridSize === 'number') { state.grid = data.gridSize; document.getElementById('grid').value = data.gridSize; }
+    document.getElementById('floor-w').value = state.floor.width;
+    document.getElementById('floor-d').value = state.floor.depth;
+    document.getElementById('wall-h').value = state.floor.wallHeight;
+    state.selected = null;
+    updateSelectionBox();
+    draw();
+  } catch (e) { alert('JSON invalide : ' + e.message); }
+});
+
+document.getElementById('btn-download').addEventListener('click', () => {
+  const blob = new Blob([document.getElementById('json').value], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'hub.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// Sélection — panneau édition
+function updateSelectionBox() {
+  const box = document.getElementById('selection-box');
+  box.innerHTML = '';
+  const s = state.selected;
+  if (!s) { box.innerHTML = '<div class="empty">Rien de sélectionné</div>'; return; }
+
+  const title = document.createElement('div');
+  title.className = 'title';
+  title.textContent = s.type.toUpperCase() + (s.index != null ? ' #' + s.index : '');
+  box.appendChild(title);
+
+  function field(label, value, onchange, opts = {}) {
+    const row = document.createElement('div'); row.className = 'row';
+    const l = document.createElement('label'); l.textContent = label; row.appendChild(l);
+    const inp = document.createElement('input');
+    inp.type = opts.type || 'text';
+    if (opts.type === 'number') { inp.step = opts.step || 1; }
+    inp.value = value;
+    inp.addEventListener('input', (e) => { onchange(e.target.value); exportJson(); draw(); });
+    row.appendChild(inp);
+    box.appendChild(row);
+  }
+  function select(label, value, options, onchange) {
+    const row = document.createElement('div'); row.className = 'row';
+    const l = document.createElement('label'); l.textContent = label; row.appendChild(l);
+    const sel = document.createElement('select');
+    options.forEach(o => {
+      const op = document.createElement('option'); op.value = o; op.textContent = o;
+      if (o === value) op.selected = true;
+      sel.appendChild(op);
+    });
+    sel.addEventListener('change', (e) => { onchange(e.target.value); exportJson(); draw(); });
+    row.appendChild(sel);
+    box.appendChild(row);
+  }
+
+  if (s.type === 'wall') {
+    const w = state.walls[s.index];
+    field('X1', w.x1, v => w.x1 = +v || 0, { type: 'number' });
+    field('Z1', w.z1, v => w.z1 = +v || 0, { type: 'number' });
+    field('X2', w.x2, v => w.x2 = +v || 0, { type: 'number' });
+    field('Z2', w.z2, v => w.z2 = +v || 0, { type: 'number' });
+  } else if (s.type === 'painting') {
+    const p = state.paintings[s.index];
+    field('ID', p.id, v => p.id = v);
+    field('Label', p.label, v => p.label = v);
+    select('Mode', p.mode, ['marathon', 'sprint40', 'zen'], v => p.mode = v);
+    field('X', p.x, v => p.x = +v || 0, { type: 'number' });
+    field('Z', p.z, v => p.z = +v || 0, { type: 'number' });
+    field('Rotation Y (deg)', p.rotationY ?? 0, v => p.rotationY = +v || 0, { type: 'number', step: 45 });
+  } else if (s.type === 'spawn') {
+    field('X', state.spawn.x, v => state.spawn.x = +v || 0, { type: 'number' });
+    field('Z', state.spawn.z, v => state.spawn.z = +v || 0, { type: 'number' });
+    field('Angle (deg)', state.spawn.angle ?? 0, v => state.spawn.angle = +v || 0, { type: 'number', step: 45 });
+  }
+}
+
+// ============================================================================
+// EXPORT / INIT
+// ============================================================================
+
+function exportJson() {
+  const data = {
+    version: 1,
+    name: 'Hub',
+    gridSize: state.grid,
+    floor: state.floor,
+    walls: state.walls,
+    paintings: state.paintings,
+    spawn: state.spawn,
+  };
+  document.getElementById('json').value = JSON.stringify(data, null, 2);
+}
+
+// Map de démo au boot : salle rectangulaire simple + 3 tableaux
+function loadDemo() {
+  const W = state.floor.width, D = state.floor.depth;
+  state.walls = [
+    { x1: -W/2, z1: -D/2, x2:  W/2, z2: -D/2 },  // mur arrière
+    { x1:  W/2, z1: -D/2, x2:  W/2, z2:  D/2 },  // mur droit
+    { x1:  W/2, z1:  D/2, x2: -W/2, z2:  D/2 },  // mur avant
+    { x1: -W/2, z1:  D/2, x2: -W/2, z2: -D/2 },  // mur gauche
+  ];
+  state.paintings = [
+    { id: 'marathon', label: 'MARATHON', mode: 'marathon', x: -400, z: -950 + 20, rotationY: 0 },
+    { id: 'sprint40', label: 'SPRINT 40L', mode: 'sprint40', x: 0, z: -950 + 20, rotationY: 0 },
+    { id: 'zen', label: 'ZEN', mode: 'zen', x: 400, z: -950 + 20, rotationY: 0 },
+  ];
+  state.spawn = { x: 0, z: 400, angle: 180 };
+}
+
+loadDemo();
+resize();
+exportJson();
+</script>
+</body>
+</html>
