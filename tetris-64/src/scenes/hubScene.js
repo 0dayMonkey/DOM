@@ -32,9 +32,7 @@ import { el } from '../utils/helpers.js';
  * répond 200 est utilisé. Ajoute/retire selon ta structure de déploiement.
  */
 const MAP_URLS = [
-  '/public/maps/hub-default.json',
-  './public/maps/hub-default.json',
-  'public/maps/hub-default.json',
+  './public/map/hub-default.json', 
 ];
 
 /**

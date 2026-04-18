@@ -1,182 +1,361 @@
 /**
- * title.css — Écran titre (logo + cubes qui orbitent + prompt "Appuyez sur Entrée").
+ * title.css — Écran titre (logo arcade "TETRIS 67" + cubes qui orbitent
+ * + prompt "Appuyez sur Entrée").
  *
- * L'écran titre est monté comme une scène 3D via titleScene.js. Les éléments
- * visuels principaux sont :
+ * L'écran titre est monté comme une scène 3D via titleScene.js. Les
+ * éléments visuels principaux sont :
  *   - un fond animé (skybox + fog gérés au niveau global)
- *   - le logo "TETRIS 64" avec effet relief
+ *   - le logo TETRIS 67 :
+ *       · "TETRIS" en rouge métallique biseauté 3D, contour bleu clair
+ *         lumineux (style arcade Sega/Atari mid-90s)
+ *       · "67" doré incandescent avec halo ambre (style feu/chrome)
  *   - un sous-titre discret
- *   - une ceinture de tétrominos qui orbitent (calculs de position en JS)
+ *   - une ceinture de tétrominos qui orbitent (calculs de position en JS,
+ *     posées DÈS le mount pour éviter tout flash au centre)
  *   - un prompt clignotant "APPUYEZ SUR ENTRÉE"
  *   - une ligne de crédits en bas
+ *
+ * RÉFÉRENCE VISUELLE : logo Tetris 1996 style arcade / N64 launch,
+ * grosses lettres biseautées rouge orangé sur contour chrome/néon bleu,
+ * avec un "67" chromé-doré incandescent posé en dessous.
  */
 
  .title-scene {
-    position: absolute;
-    inset: 0;
-    transform-style: preserve-3d;
-    perspective: 1200px;
-  }
-  
-  /* ==========================================================================
-     LOGO
-     ========================================================================== */
-  
-  .title__logo-wrap {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform-style: preserve-3d;
-    /* Centré autour du point (0,0) ; le wrap est en pseudo-3D au-dessus */
-    transform: translate3d(-50%, -60%, 0);
-    text-align: center;
-    pointer-events: none;
-    animation: title-logo-float 3.4s ease-in-out infinite;
-  }
-  
-  .title__logo {
-    font-family: 'Lilita One', 'Press Start 2P', sans-serif;
-    font-size: clamp(48px, 13vw, 180px);
-    line-height: 0.9;
-    letter-spacing: 6px;
-    color: var(--n64-gold, #F0C040);
-    margin: 0;
-    text-shadow:
-      /* Contour N64 épais */
-      4px  4px 0 var(--outline-dark),
-      -4px -4px 0 var(--outline-dark),
-       4px -4px 0 var(--outline-dark),
-      -4px  4px 0 var(--outline-dark),
-       0    4px 0 var(--outline-dark),
-       0   -4px 0 var(--outline-dark),
-       4px  0   0 var(--outline-dark),
-      -4px  0   0 var(--outline-dark),
-      /* Ombre portée */
-      8px 8px 0 rgba(0, 0, 0, 0.4);
-    /* Petit dégradé sur le texte pour simuler la 3D */
-    background:
-      linear-gradient(
-        180deg,
-        #FFF8C8 0%,
-        var(--n64-gold, #F0C040) 55%,
-        #A37010 100%
-      );
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    /* Et on double avec un text-shadow coloré sous le texte */
-    filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.45));
-  }
-  
-  .title__subtitle {
-    font-family: 'Press Start 2P', monospace;
-    font-size: clamp(10px, 1.6vw, 14px);
-    letter-spacing: 4px;
-    color: var(--ui-text-light, #FFF8E0);
-    text-shadow: var(--shadow-text-small);
-    margin-top: 12px;
-    opacity: 0.9;
-  }
-  
-  @keyframes title-logo-float {
-    0%, 100% { transform: translate3d(-50%, -60%, 0) rotateX(0deg); }
-    50%      { transform: translate3d(-50%, -56%, 0) rotateX(-2deg); }
-  }
-  
-  /* ==========================================================================
-     PROMPT — "APPUYEZ SUR ENTRÉE"
-     ========================================================================== */
-  
-     .title__prompt {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, 200px);   /* centré horizontalement, 200px sous le centre */
-      font-family: 'Press Start 2P', monospace;
-      font-size: clamp(12px, 2vw, 18px);
-      letter-spacing: 3px;
-      color: var(--ui-text-light, #FFF8E0);
-      text-shadow: var(--shadow-text);
-      text-align: center;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity var(--dur-slow) var(--ease-out);
-    }
-  .title__prompt.is-visible {
-    opacity: 1;
-    
-    animation: title-prompt-blink 1.2s steps(2, end) infinite;
-  }
-  
-  @keyframes title-prompt-blink {
-    50% { opacity: 0.2; }
-  }
-  
-  /* ==========================================================================
-     CRÉDITS
-     ========================================================================== */
-  
-  .title__credits {
-    position: absolute;
-    bottom: 220px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-family: 'Press Start 2P', monospace;
-    font-size: 9px;
-    letter-spacing: 2px;
-    color: rgba(255, 248, 224, 0.55);
-    pointer-events: none;
-    white-space: nowrap;
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  perspective: 1200px;
+}
 
+/* ==========================================================================
+   LOGO — wrap général
+   ========================================================================== */
+
+.title__logo-wrap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-style: preserve-3d;
+  transform: translate3d(-50%, -60%, 0);
+  text-align: center;
+  pointer-events: none;
+  animation: title-logo-float 3.4s ease-in-out infinite;
+}
+
+.title__logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  /* Couche de base : léger glow général pour asseoir le logo sur le fond */
+  transform-style: preserve-3d;
+
+}
+
+/* ==========================================================================
+   LOGO — "TETRIS" rouge métallique biseauté contour bleu
+   ==========================================================================
+
+   Technique en couches (empilées via ::before / ::after) :
+     - Le texte principal utilise un dégradé rouge/orange metallique via
+       background-clip: text.
+     - text-shadow fait la chrome multiline : plusieurs outlines concentriques
+       qui simulent d'abord un liseré sombre, puis un contour bleu clair
+       lumineux (cyan/bleu azur), puis un halo flou.
+   ========================================================================== */
+
+.title__logo-main {
+  position: relative;
+  line-height: 0.85;
+  padding: 0.1em 0.15em 0.15em;
+}
+
+.title__logo-main-inner {
+  font-family: "Press Start 2P", system-ui;
+  font-weight: 900;
+  font-style: italic; /* léger italique arcade — très 1996 */
+  font-size: clamp(56px, 10vw, 130px);
+  letter-spacing: 2px;
+  /* Transformation "biseau arcade" : un petit scaleY pour étirer verticalement,
+     comme les logos 3D rendus en DOOM/Tetris de l'époque. */
+  transform: scaleY(1.15);
+  display: inline-block;
+
+  /* Dégradé rouge/orange métallique simulant le chrome peint */
+  background:
+    linear-gradient(
+      180deg,
+      #FFC080 0%,
+      #FF5A1F 22%,
+      #D41E1E 52%,
+      #7A0A0A 82%,
+      #3A0404 100%
+    );
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+
+  /* Contour composite :
+     - 1ère couche : fin liseré noir qui ferme les lettres
+     - 2e couche : contour bleu clair néon (la signature du logo 1996)
+     - 3e couche : halo flou bleu plus doux pour l'ambiance lumineuse
+     - 4e couche : ombre portée sombre pour asseoir le bloc */
+  text-shadow:
+    /* Liseré noir interne (épouse la forme) */
+    1px 0 0 #1a0000,
+    -1px 0 0 #1a0000,
+    0 1px 0 #1a0000,
+    0 -1px 0 #1a0000,
+    /* Contour chrome bleu clair — l'élément signature */
+    3px 0 0 #A8D8FF,
+    -3px 0 0 #A8D8FF,
+    0 3px 0 #A8D8FF,
+    0 -3px 0 #A8D8FF,
+    3px 3px 0 #A8D8FF,
+    -3px -3px 0 #A8D8FF,
+    3px -3px 0 #A8D8FF,
+    -3px 3px 0 #A8D8FF,
+    /* Halo néon bleu plus diffus */
+    0 0 18px rgba(120, 200, 255, 0.65),
+    0 0 32px rgba(120, 200, 255, 0.35),
+    /* Ombre portée dure (sensation 3D arcade) */
+    6px 8px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* Effet "reflet" : une bande lumineuse horizontale sur la partie haute du
+   texte, créée via un pseudo-élément superposé et clipé au texte. Donne la
+   sensation de métal poli. */
+.title__logo-main::after {
+  content: attr(data-pseudo);
+  display: none; /* neutralisé : le reflet est géré dans le inner via gradient */
+}
+
+/* ==========================================================================
+   LOGO — "67" doré incandescent avec halo ambre
+   ==========================================================================
+
+   Style chromé-doré avec un feu orangé en fond et un halo lumineux
+   prononcé. Légèrement superposé au TETRIS (pour évoquer la composition
+   de l'original où le "64" chevauche la barre inférieure du "TETRIS").
+   ========================================================================== */
+
+.title__logo-number {
+  position: relative;
+  margin-top: -0.18em; /* léger chevauchement avec le TETRIS au-dessus */
+  line-height: 0.9;
+  /* Halo ambre derrière le 67, dessiné par drop-shadow multiples */
+  filter:
+    drop-shadow(0 0 12px rgba(255, 180, 60, 0.7))
+    drop-shadow(0 0 28px rgba(255, 140, 20, 0.55))
+    drop-shadow(0 0 48px rgba(255, 100, 0, 0.35));
+}
+
+.title__logo-number-inner {
+  font-family: 'Lilita One', 'Arial Black', sans-serif;
+  font-weight: 900;
+  font-style: italic;
+  font-size: clamp(52px, 13vw, 180px);
+  letter-spacing: 4px;
+  transform: scaleY(1.2);
+  display: inline-block;
+
+  /* Dégradé doré-feu : crème en haut, jaune vif, orange brûlé, rouge sombre */
+  background:
+    linear-gradient(
+      180deg,
+      #FFF8D0 0%,
+      #FFD85A 18%,
+      #FF9A20 45%,
+      #B04010 72%,
+      #3A0A00 100%
+    );
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+
+  /* Contour blanc cassé lumineux + liseré noir + halo doré */
+  text-shadow:
+    /* Liseré sombre interne */
+    1px 0 0 #2a0d00,
+    -1px 0 0 #2a0d00,
+    0 1px 0 #2a0d00,
+    0 -1px 0 #2a0d00,
+    /* Contour blanc crème brillant (signature métal doré) */
+    3px 0 0 #FFF2CF,
+    -3px 0 0 #FFF2CF,
+    0 3px 0 #FFF2CF,
+    0 -3px 0 #FFF2CF,
+    3px 3px 0 #FFF2CF,
+    -3px -3px 0 #FFF2CF,
+    3px -3px 0 #FFF2CF,
+    -3px 3px 0 #FFF2CF,
+    /* Halo ambré */
+    0 0 22px rgba(255, 170, 50, 0.75),
+    0 0 42px rgba(255, 120, 20, 0.5),
+    /* Ombre portée dure */
+    5px 7px 0 rgba(0, 0, 0, 0.6);
+
+  /* Animation subtile : légère pulsation du halo (via filter sur parent) */
+  animation: title-number-glow 2.4s ease-in-out infinite;
+}
+
+@keyframes title-number-glow {
+  0%, 100% { filter: brightness(1);    }
+  50%      { filter: brightness(1.12); }
+}
+
+/* ==========================================================================
+   SUBTITLE
+   ========================================================================== */
+
+.title__subtitle {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(10px, 1.6vw, 14px);
+  letter-spacing: 4px;
+  color: var(--ui-text-light, #FFF8E0);
+  text-shadow: var(--shadow-text-small);
+  margin-top: 22px;
+  opacity: 0.88;
+}
+
+@keyframes title-logo-float {
+  0%, 100% { transform: translate3d(-50%, -60%, 0) rotateX(0deg); }
+  50%      { transform: translate3d(-50%, -57%, 0) rotateX(-2deg); }
+}
+
+/* ==========================================================================
+   PROMPT — "APPUYEZ SUR ENTRÉE"
+   ========================================================================== */
+
+.title__prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, 260px);
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(12px, 2vw, 18px);
+  letter-spacing: 3px;
+  color: var(--ui-text-light, #FFF8E0);
+  text-shadow: var(--shadow-text);
+  text-align: center;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-slow) var(--ease-out);
+}
+
+.title__prompt.is-visible {
+  opacity: 1;
+  animation: title-prompt-blink 1.2s steps(2, end) infinite;
+}
+
+@keyframes title-prompt-blink {
+  50% { opacity: 0.2; }
+}
+
+/* ==========================================================================
+   CRÉDITS
+   ========================================================================== */
+
+.title__credits {
+  position: absolute;
+  bottom: 250px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: rgba(255, 248, 224, 0.55);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   CUBES ORBITANTS
+   ==========================================================================
+
+   FIX "ghost au chargement" :
+     - .title__cube-slot part en opacity:0 pour ne jamais être visible
+       au centre avant que sa transform d'orbite soit appliquée
+     - .is-ready (posé par JS au 1er requestAnimationFrame) fade-in en
+       120ms : les cubes apparaissent DÉJÀ sur leur orbite, pas au centre.
+   ========================================================================== */
+
+.title__cubes {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.title__cube-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.title__cube-slot.is-ready {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .title__logo-main-inner,
+  .title__logo-number-inner {
+    letter-spacing: 1px;
+    text-shadow:
+      1px 0 0 #1a0000,
+      -1px 0 0 #1a0000,
+      0 1px 0 #1a0000,
+      0 -1px 0 #1a0000,
+      2px 0 0 #A8D8FF,
+      -2px 0 0 #A8D8FF,
+      0 2px 0 #A8D8FF,
+      0 -2px 0 #A8D8FF,
+      2px 2px 0 #A8D8FF,
+      -2px -2px 0 #A8D8FF,
+      0 0 12px rgba(120, 200, 255, 0.55),
+      4px 5px 0 rgba(0, 0, 0, 0.5);
   }
-  
-  /* ==========================================================================
-     CUBES ORBITANTS
-     ========================================================================== */
-  
-  .title__cubes {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform-style: preserve-3d;
-    pointer-events: none;
+  .title__logo-number-inner {
+    text-shadow:
+      1px 0 0 #2a0d00,
+      -1px 0 0 #2a0d00,
+      0 1px 0 #2a0d00,
+      0 -1px 0 #2a0d00,
+      2px 0 0 #FFF2CF,
+      -2px 0 0 #FFF2CF,
+      0 2px 0 #FFF2CF,
+      0 -2px 0 #FFF2CF,
+      2px 2px 0 #FFF2CF,
+      -2px -2px 0 #FFF2CF,
+      0 0 16px rgba(255, 170, 50, 0.65),
+      4px 5px 0 rgba(0, 0, 0, 0.55);
   }
-  
-  .title__cube-slot {
-    position: absolute;
-    top: 0;
-    left: 0;
-    transform-style: preserve-3d;
-    will-change: transform;
+  .title__subtitle {
+    letter-spacing: 2px;
+    margin-top: 14px;
   }
-  
-  /* ==========================================================================
-     Responsive
-     ========================================================================== */
-  
-  @media (max-width: 768px) {
-    .title__logo {
-      letter-spacing: 3px;
-      text-shadow:
-        3px 3px 0 var(--outline-dark),
-        -3px -3px 0 var(--outline-dark),
-        3px -3px 0 var(--outline-dark),
-        -3px 3px 0 var(--outline-dark),
-        6px 6px 0 rgba(0, 0, 0, 0.4);
-    }
-    .title__subtitle {
-      letter-spacing: 2px;
-    }
-    .title__prompt {
-      top: 86%;
-      font-size: 12px;
-      
-    }
+  .title__prompt {
+    transform: translate(-50%, 180px);
+    font-size: 12px;
   }
-  
-  /* Reduced motion : on fige le logo et on remplace le blink par un simple contour */
-  @media (prefers-reduced-motion: reduce) {
-    .title__logo-wrap { animation: none !important; }
-    .title__prompt.is-visible { animation: none !important; opacity: 1; }
-  }
+}
+
+/* Reduced motion : on fige le logo et on remplace le blink par un simple contour */
+@media (prefers-reduced-motion: reduce) {
+  .title__logo-wrap          { animation: none !important; }
+  .title__logo-number-inner  { animation: none !important; }
+  .title__prompt.is-visible  { animation: none !important; opacity: 1; }
+  .title__cube-slot          { transition: none !important; }
+}

@@ -1,9 +1,10 @@
 /**
  * titleScene.js — Écran titre.
  *
- * Le titre est notre "cold open" Nintendo 64 : le logo TETRIS 64 flotte
- * lentement dans un ciel violet/orange, quelques cubes Tetris orbitent
- * autour, et un prompt clignote pour inviter à appuyer sur ENTRÉE.
+ * Le titre est notre "cold open" arcade/N64 : le logo TETRIS 67 trône
+ * au centre (TETRIS rouge métallique biseauté + 67 doré incandescent),
+ * quelques tétrominos orbitent autour, et un prompt clignote pour inviter
+ * à appuyer sur ENTRÉE.
  *
  * Sur interact/START, on enchaîne directement sur la scène HUB (Mario 64
  * style) : le joueur choisira son mode via les tableaux interactifs du
@@ -24,6 +25,13 @@
  *   On utilise la transition signature 'tetris' — une cascade de blocs
  *   tétrominos qui recouvre l'écran puis disparaît en line clear,
  *   révélant le hub. Cohérent avec l'ADN du jeu.
+ *
+ * FIX CUBES "GHOST" AU CHARGEMENT :
+ *   Les orbit cubes sont désormais positionnés **dès leur création**
+ *   (avec t=0 appliqué immédiatement) dans spawnOrbitCubes(), et leur
+ *   classe CSS démarre en opacity:0 avec fade-in bref pour éviter tout
+ *   flash visible au milieu de l'écran. Plus de cluster de cubes statique
+ *   visible entre le mount et la première frame d'update().
  */
 
 import { ACTIONS, SCENES } from '../core/constants.js';
@@ -64,7 +72,7 @@ export function createTitleScene() {
     root = buildRoot();
     ctx.root.appendChild(root);
 
-    // Cubes d'ambiance
+    // Cubes d'ambiance — déjà positionnés sur leur orbite à la création
     orbitCubes = spawnOrbitCubes(root);
 
     // Musique
@@ -88,14 +96,29 @@ export function createTitleScene() {
 
   /**
    * Construit la racine DOM 3D : logo + prompt + conteneur pour cubes.
+   *
+   * LOGO : on sépare maintenant "TETRIS" et "67" dans deux éléments
+   * distincts pour pouvoir leur appliquer des styles radicalement
+   * différents (rouge métallique vs doré incandescent).
    */
   function buildRoot() {
     const r = el('div', { class: 'title-scene' });
 
-    // Logo
+    // Logo : structure en deux blocs (TETRIS rouge / 67 doré)
     const logoWrap = el('div', { class: 'title__logo-wrap' });
-    const logo = el('h1', { class: 'title__logo' }, 'TETRIS 64');
-    const sub = el('div', { class: 'title__subtitle' }, 'UN JEU N64 DE 1996');
+    const logo = el('div', { class: 'title__logo' });
+
+    const logoMain = el('div', { class: 'title__logo-main' }, [
+      el('span', { class: 'title__logo-main-inner', 'data-text': 'TETRIS' }, 'TETRIS'),
+    ]);
+    const logoNumber = el('div', { class: 'title__logo-number' }, [
+      el('span', { class: 'title__logo-number-inner', 'data-text': '67' }, '67'),
+    ]);
+
+    logo.appendChild(logoMain);
+    logo.appendChild(logoNumber);
+
+    const sub = el('div', { class: 'title__subtitle' }, 'UN JEU ARCADE DE 1996');
     logoWrap.appendChild(logo);
     logoWrap.appendChild(sub);
 
@@ -106,7 +129,7 @@ export function createTitleScene() {
     const cubesWrap = el('div', { class: 'title__cubes' });
 
     // Crédits discrets
-    const credits = el('div', { class: 'title__credits' }, '© 2024 — HTML · CSS · JS');
+    const credits = el('div', { class: 'title__credits' }, '© 67 PRODUCTION');
 
     r.appendChild(cubesWrap);
     r.appendChild(logoWrap);
@@ -117,8 +140,16 @@ export function createTitleScene() {
   }
 
   /**
-   * Spawn une dizaine de tétrominos qui tournent lentement autour du logo.
+   * Spawn des tétrominos qui orbitent autour du logo.
+   *
+   * IMPORTANT : chaque cube se voit appliquer sa transform d'orbite
+   * DÈS SA CRÉATION (avec t=0), de sorte qu'il apparaisse pile sur son
+   * orbite initiale et non au centre (0, 0, 0) du conteneur. Cela évite
+   * le flash visible au milieu de l'écran entre le mount et la première
+   * frame d'update.
+   *
    * @param {HTMLElement} rootEl
+   * @returns {HTMLElement[]}
    */
   function spawnOrbitCubes(rootEl) {
     const host = /** @type {HTMLElement} */ (rootEl.querySelector('.title__cubes'));
@@ -126,21 +157,50 @@ export function createTitleScene() {
     const types = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
     const items = [];
     const count = 9;
+
     for (let i = 0; i < count; i++) {
       const type = types[i % types.length];
       const slot = el('div', { class: 'title__cube-slot' });
-      slot.dataset.angle = String((i / count) * Math.PI * 2);
-      slot.dataset.radius = String(280 + (i % 3) * 60);
-      slot.dataset.speed = String(0.18 + (i % 3) * 0.08);
-      slot.dataset.height = String(-60 + (i % 4) * 40);
+
+      // Paramètres de l'orbite, stockés en dataset pour que update() les lise
+      const angle0 = (i / count) * Math.PI * 2;
+      const radius = 280 + (i % 3) * 60;
+      const speed = 0.18 + (i % 3) * 0.08;
+      const height = -60 + (i % 4) * 40;
+
+      slot.dataset.angle = String(angle0);
+      slot.dataset.radius = String(radius);
+      slot.dataset.speed = String(speed);
+      slot.dataset.height = String(height);
+
+      // Rendu de la pièce DANS le slot
       piecer.renderPieceCentered(type, 0, slot, {
         mode: 'full',
         containerSize: 72,
         cubeSize: 16,
       });
+
+      // Application IMMÉDIATE de la transform d'orbite (équivalent à t=0)
+      // pour que le cube apparaisse pile sur son orbite, pas au centre.
+      const x = Math.cos(angle0) * radius;
+      const y = height;
+      const z = Math.sin(angle0) * radius;
+      const ry = (angle0 * 180) / Math.PI;
+      slot.style.transform =
+        `translate3d(${x}px, ${y}px, ${z}px) rotateY(${ry}deg) rotateX(0deg)`;
+
       host.appendChild(slot);
       items.push(slot);
     }
+
+    // Sécurité supplémentaire : on révèle les cubes sur la frame suivante,
+    // une fois qu'on est sûr que leur transform est committée par le
+    // navigateur. Cela élimine tout risque de "flash au centre" même sur
+    // les navigateurs lents à peindre la première frame.
+    requestAnimationFrame(() => {
+      for (const s of items) s.classList.add('is-ready');
+    });
+
     return items;
   }
 

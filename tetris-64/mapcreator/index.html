@@ -954,11 +954,69 @@ function applyToGame() {
   }
 }
 
-function clearGameMap() {
-  if (!confirm('Supprimer la map sauvegardée ? Le jeu reviendra aux défauts.')) return;
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(STORAGE_KEY + '.updatedAt');
-  showStatus('Map effacée du jeu.', 'ok');
+
+
+const DEFAULT_MAP_URLS = [
+  '/public/maps/hub-default.json',
+  './public/maps/hub-default.json',
+  '../public/maps/hub-default.json',
+  'public/maps/hub-default.json',
+];
+
+/**
+ * Charge hub-default.json depuis les chemins possibles.
+ * @returns {Promise<object | null>}
+ */
+ async function loadDefaultMapJson() {
+  for (const url of DEFAULT_MAP_URLS) {
+    try {
+      const res = await fetch(url, { cache: 'no-cache' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data === 'object') return data;
+      }
+    } catch (_) { /* on essaie le suivant */ }
+  }
+  return null;
+}
+
+/**
+ * Réinitialise la map : charge hub-default.json, l'écrit dans localStorage
+ * comme map active du jeu, ET l'affiche dans l'éditeur. Si le fichier n'est
+ * pas trouvé, on retombe sur une map vide rectangulaire.
+ */
+ async function clearGameMap() {
+  if (!confirm(
+    'Réinitialiser la map ?\n\n' +
+    'La map active du jeu sera remplacée par hub-default.json.'
+  )) return;
+
+  const defaultData = await loadDefaultMapJson();
+
+  if (!defaultData) {
+    showStatus('hub-default.json introuvable. Rien changé.', 'err');
+    return;
+  }
+
+  // 1. On l'écrit dans le localStorage comme map active du jeu
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
+    localStorage.setItem(STORAGE_KEY + '.updatedAt', String(Date.now()));
+  } catch (e) {
+    showStatus('Écriture localStorage échouée : ' + e.message, 'err');
+    return;
+  }
+
+  // 2. On l'applique aussi à l'éditeur (pour que l'UI reflète l'état)
+  applyDataToState(defaultData);
+  syncUIFromState();
+  state.selected = null;
+  updateSelectionBox();
+  exportJson();
+  fitViewToMap();
+  draw();
+
+  showStatus('✓ Map réinitialisée depuis hub-default.json.', 'ok');
 }
 
 function showStatus(msg, kind = 'ok') {
