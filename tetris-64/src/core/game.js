@@ -40,6 +40,7 @@ import {
     mergePiece,
     findFullLines,
     clearLines,
+    applyCascadeGravity,
     isBoardEmpty,
     dropDistance,
   } from './board.js';
@@ -369,9 +370,10 @@ import {
     /** Fin de l'animation de clear : on efface réellement et on enchaîne. */
     function finalizeClear() {
       if (state.pendingClearLines.length > 0) {
+        const cleared = clearLines(state.board.grid, state.pendingClearLines);
         state.board = {
           ...state.board,
-          grid: clearLines(state.board.grid, state.pendingClearLines),
+          grid: applyCascadeGravity(cleared),
         };
         state.pendingClearLines = [];
       }
