@@ -1,0 +1,99 @@
+================================================================================
+TETRIS 67 — INSTRUCTIONS DE CAPTURE VIDÉO
+================================================================================
+
+Résolution : 1920x1080
+Framerate  : 30 fps
+Codec      : WebM (VP9) recommandé — fallback MP4 (H.264)
+Navigateur : Chrome/Chromium en plein écran (F11), sans barre d'onglets
+Divers     : Coupe les notifs système, ferme les apps inutiles
+
+Capture recommandée : OBS Studio (Linux/Mac/Win) ou Xbox Game Bar (Win).
+OBS : source "Fenêtre" ou "Affichage", export .webm ou .mp4 30 fps.
+
+Chaque clip doit être déposé dans ce dossier :
+  promo/public/clips/
+
+--------------------------------------------------------------------------------
+CLIP 01 — ÉCRAN TITRE
+--------------------------------------------------------------------------------
+Fichier         : 01-title.webm
+Durée à filmer  : 10 secondes (on utilisera 6s)
+Que faire       : Ouvre https://tetris.teamcrouton.com/ et laisse la page
+                  titre animée tourner sans rien toucher. Capture la scène
+                  entière ("TETRIS 67", "© 67 PRODUCTION", "APPUYEZ SUR ENTRÉE"
+                  qui pulse, et les tétriminos flottants).
+Note            : Actuellement la scène titre est *déjà utilisée* via un texte
+                  Remotion animé. Ce clip n'est donc PAS strictement nécessaire
+                  si tu utilises la scène Remotion par défaut. Si tu veux
+                  remplacer par la capture, édite src/Video.tsx :
+                  remplace <TitleScene /> par <ClipPlayer src="clips/01-title.webm" />
+
+--------------------------------------------------------------------------------
+CLIP 02 — HUB 3D
+--------------------------------------------------------------------------------
+Fichier         : 02-hub.webm
+Durée à filmer  : 15 secondes (on utilisera 12s)
+Que faire       : Depuis l'écran titre, appuie sur ENTRÉE pour entrer dans
+                  le hub. Déplace LENTEMENT le personnage (flèches ou ZQSD)
+                  de gauche à droite devant les 3 portes Marathon / Sprint 40L
+                  / Zen. Approche-toi d'une porte à la fin pour qu'on sente
+                  le 3D. Ne sélectionne PAS de mode (on reste dans le hub).
+À montrer       : Le sol en damier, les 3 portes colorées (violet/bleu/vert),
+                  le perso qui bouge, la perspective 3D qui change.
+
+--------------------------------------------------------------------------------
+CLIP 03 — GAMEPLAY MARATHON
+--------------------------------------------------------------------------------
+Fichier         : 03-marathon.webm
+Durée à filmer  : 15 secondes (on utilisera 12s)
+Que faire       : Lance une partie MARATHON. Joue proprement : place des
+                  pièces, fais AU MOINS 1 TETRIS (4 lignes avec un I) et si
+                  possible 1 T-SPIN visible (T qui tourne dans un trou).
+                  Un combo x2 ou x3 est top. Ne meurs pas pendant les 15s.
+À montrer       : Pièces qui tombent, tetris avec flash, compteur LIGNES qui
+                  augmente, score qui monte, animations de line clear.
+
+--------------------------------------------------------------------------------
+CLIP 04 — GAMEPLAY SPRINT 40L
+--------------------------------------------------------------------------------
+Fichier         : 04-sprint.webm
+Durée à filmer  : 12 secondes (on utilisera 10s)
+Que faire       : Lance SPRINT 40L. Joue vite, hard-drop (Espace) les pièces
+                  rapidement. On veut voir le TIMER qui défile (00:XX.XXX)
+                  en bas à droite et la queue NEXT qui s'enchaîne.
+À montrer       : Tempo rapide, compteur lignes qui avance (X/40), timer
+                  visible, next queue à droite.
+
+--------------------------------------------------------------------------------
+CLIP 05 — GAMEPLAY ZEN
+--------------------------------------------------------------------------------
+Fichier         : 05-zen.webm
+Durée à filmer  : 10 secondes (on utilisera 8s)
+Que faire       : Lance ZEN (pas de pression, pas de timer). Joue posément,
+                  fais des mouvements propres, utilise le HOLD (C ou Shift)
+                  au moins 1 fois, et fais quelques rotations SRS (kicks).
+À montrer       : Ambiance détendue, la pièce en hold (cadre gauche), des
+                  rotations qui passent dans des coins serrés.
+
+--------------------------------------------------------------------------------
+CLIP 06 — MAP CREATOR
+--------------------------------------------------------------------------------
+Fichier         : 06-mapcreator.webm
+Durée à filmer  : 15 secondes (on utilisera 12s)
+Que faire       : Ouvre https://tetris.teamcrouton.com/mapcreator/
+                  1. Place quelques MURS (clic/drag pour tracer)
+                  2. Ajoute 1–2 TABLEAUX (peintures)
+                  3. Déplace le SPAWN du joueur
+                  4. Fais un ZOOM/PAN rapide pour montrer la vue
+                  5. Clique sur EXPORT pour montrer le JSON généré (optionnel)
+À montrer       : L'interface 3 colonnes (outils / canvas / propriétés),
+                  la grille éditable, le curseur qui trace, le rendu live.
+
+================================================================================
+NOMMAGE : respecte exactement les noms de fichiers ci-dessus, sinon les
+          scènes Remotion ne trouveront pas les clips.
+
+RETAIL : Si un clip est plus court que prévu, la scène le bouclera/figera ;
+         si plus long, seul le début sera utilisé. Garde ~2s de marge.
+================================================================================
