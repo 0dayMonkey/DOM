@@ -174,7 +174,7 @@ import {
   
           if (cell === CELL_EMPTY) {
             if (existing) {
-              locked.removeChild(existing);
+              if (existing.parentNode) existing.parentNode.removeChild(existing);
               cellMap.delete(key);
             }
           } else {
@@ -186,7 +186,10 @@ import {
               locked.appendChild(cube);
               cellMap.set(key, cube);
             } else {
-              // Changement de type (rare, mais possible après line shift)
+              // Cube recyclé après line clear : une cellule occupée ne doit
+              // jamais conserver l'anim --clearing (scale 0 / opacity 0),
+              // sinon elle reste invisible alors que la grille la marque pleine.
+              existing.classList.remove('board__cell--clearing');
               const existingType = existing.getAttribute('data-type');
               if (existingType !== type) {
                 pieceRenderer.retypePiece(existing, type);
