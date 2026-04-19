@@ -234,6 +234,38 @@ import {
     return out;
   }
   
+  /**
+   * Applique une gravité par cellule colonne-par-colonne : chaque bloc non-vide
+   * tombe jusqu'à reposer sur un autre bloc ou sur le fond, indépendamment
+   * des autres. Utilisé après clearLines pour éliminer les blocs flottants
+   * résiduels (cascade gravity).
+   *
+   * Préserve l'ordre vertical des blocs dans chaque colonne (le bloc le plus
+   * haut reste le plus haut).
+   *
+   * @param {Grid} grid
+   * @returns {Grid}
+   */
+  export function applyCascadeGravity(grid) {
+    const rows = grid.length;
+    const cols = grid[0]?.length ?? BOARD_COLS;
+    const out = new Array(rows);
+    for (let y = 0; y < rows; y++) out[y] = new Array(cols).fill(CELL_EMPTY);
+
+    for (let x = 0; x < cols; x++) {
+      const stack = [];
+      for (let y = 0; y < rows; y++) {
+        const v = grid[y][x];
+        if (v !== CELL_EMPTY) stack.push(v);
+      }
+      const base = rows - stack.length;
+      for (let i = 0; i < stack.length; i++) {
+        out[base + i][x] = stack[i];
+      }
+    }
+    return out;
+  }
+
   // ============================================================================
   // UTILITAIRES
   // ============================================================================
